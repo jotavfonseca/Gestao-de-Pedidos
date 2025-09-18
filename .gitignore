@@ -1,0 +1,20 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Build outputs
+bin/
+obj/
+
+# Docker
+*.env
+
+# Node / Frontend
+node_modules/
+dist/
+build/
+
+# Logs
+*.log
+

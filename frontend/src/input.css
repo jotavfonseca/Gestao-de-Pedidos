@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+
+/* Variáveis personalizadas (opcional) */
+@theme {
+  --font-family-sans: 'Inter', sans-serif;
+  --colors-primary: #3490dc;
+}
