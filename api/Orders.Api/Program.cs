@@ -26,15 +26,26 @@ builder.Services.AddCors(options =>
     });
 });
 
+// HealthChecks
 builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("Postgres"), name: "PostgreSQL");
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen();
-}
+    .AddNpgSql(builder.Configuration.GetConnectionString("Postgres"));
+
+// Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.MapHealthChecks("/health");
+
+app.Run();
+
 
 using (var scope = app.Services.CreateScope())
 {

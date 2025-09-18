@@ -32,7 +32,7 @@ services:
 
   api:
     build: 
-      context: ./api
+      context: ./api/Orders.Api
     env_file:
       - .env
     environment:
@@ -49,27 +49,9 @@ services:
       timeout: 5s
       retries: 5
 
-  worker:
-    build:
-      context: ./worker
-    env_file:
-      - .env
-    environment:
-      ConnectionStrings__Postgres: "${CONNECTION_STR}"
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    # você pode não precisar healthcheck aqui; deixei simples
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://api/health || exit 1"]
-      interval: 20s
-      timeout: 5s
-      retries: 3
-
   frontend:
     build:
-      context: ./frontend
+      context: ./frontend/
     env_file:
       - .env
     ports:
