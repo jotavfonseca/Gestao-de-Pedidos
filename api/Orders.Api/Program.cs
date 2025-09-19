@@ -19,14 +19,10 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
     });
 });
 
-// HealthChecks
 builder.Services.AddHealthChecks()
     .AddNpgSql(builder.Configuration.GetConnectionString("Postgres"));
 
@@ -36,17 +32,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.MapHealthChecks("/health");
-
-app.Run();
-
-
+// Apply migrations
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<OrderContext>();
@@ -68,6 +54,7 @@ app.UseRouting();
 app.UseCors();
 app.UseAuthorization();
 
+// Mapeia endpoints
 app.MapControllers();
 
 app.MapHealthChecks("/health", new HealthCheckOptions
@@ -89,4 +76,5 @@ app.MapHealthChecks("/health", new HealthCheckOptions
     }
 });
 
+// Apenas **uma** chamada final a Run
 app.Run();

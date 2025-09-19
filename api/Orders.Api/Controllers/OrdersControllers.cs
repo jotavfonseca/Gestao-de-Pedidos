@@ -13,28 +13,33 @@ namespace OrderApi.Controllers
     public class OrdersController : ControllerBase
     {
         private readonly OrderContext _context;
-        private readonly ServiceBusPublisher _publisher;
 
-        public OrdersController(OrderContext context, ServiceBusPublisher publisher)
+        public OrdersController(OrderContext context)
         {
             _context = context;
-            _publisher = publisher;
         }
 
         // POST /orders
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] Order order)
         {
-            order.Id = Guid.NewGuid();
-            order.Status = OrderStatus.Pendente;
-            order.DataCriacao = DateTime.UtcNow;
+            try
+            {
+                order.Id = Guid.NewGuid();
+                order.Status = OrderStatus.Pendente;
+                order.DataCriacao = DateTime.UtcNow;
 
-            _context.Orders.Add(order);
-            await _context.SaveChangesAsync();
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
 
-            // Nenhuma publicação na fila
+                // Nenhuma publicação na fila
 
-            return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
+                return CreatedAtAction(nameof(GetById), new { id = order.Id }, order);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Erro ao criar o pedido", ex);
+            }
         }
 
 
