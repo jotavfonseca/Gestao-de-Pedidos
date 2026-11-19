@@ -1,6 +1,48 @@
-@Orders.Api_HostAddress = http://localhost:5267
+@host = http://localhost:5000
 
-GET {{Orders.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### Criar pedido (201 + Location)
+# @name criar
+POST {{host}}/orders
+Content-Type: application/json
 
-###
+{
+  "cliente": "Ana Souza",
+  "produto": "Teclado mecânico",
+  "valor": 349.90
+}
+
+### Detalhar o pedido criado (status muda para Processando e, 5 s depois, Finalizado)
+GET {{host}}/orders/{{criar.response.body.$.id}}
+
+### Listar pedidos
+GET {{host}}/orders
+
+### Dados inválidos (400 com erros por campo)
+POST {{host}}/orders
+Content-Type: application/json
+
+{
+  "cliente": "",
+  "produto": "Mouse",
+  "valor": 0
+}
+
+### Pedido inexistente (404)
+GET {{host}}/orders/00000000-0000-0000-0000-000000000000
+
+### Módulo IA: está ativo?
+GET {{host}}/orders/ask/status
+
+### Módulo IA: pergunta (503 se ANTHROPIC_API_KEY não estiver configurada)
+POST {{host}}/orders/ask
+Content-Type: application/json
+
+{
+  "question": "Quantos pedidos estão pendentes?"
+}
+
+### Health: processo
+GET {{host}}/health/live
+
+### Health: API + PostgreSQL + Service Bus
+GET {{host}}/health/ready
