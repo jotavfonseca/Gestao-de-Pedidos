@@ -14,7 +14,7 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2022,
       globals: globals.browser,
       parserOptions: {
         ecmaVersion: 'latest',
@@ -25,5 +25,10 @@ export default defineConfig([
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
+  },
+  {
+    // Arquivos de configuração rodam no Node.
+    files: ['*.config.js'],
+    languageOptions: { globals: globals.node },
   },
 ])
