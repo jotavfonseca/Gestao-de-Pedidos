@@ -1,6 +1,6 @@
 name: gestao-de-pedidos
 
-# Uso:  cp .env.example .env && docker compose up --build -d
+# Usage:  cp .env.example .env && docker compose up --build -d
 # Frontend http://localhost:3000 · Swagger http://localhost:5000/swagger
 # pgAdmin http://localhost:8080 · Jaeger http://localhost:16686
 
@@ -40,7 +40,7 @@ services:
       postgres:
         condition: service_healthy
 
-  # SQL Server: armazenamento exigido pelo emulador do Service Bus
+  # SQL Server: storage required by the Service Bus emulator
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
@@ -53,7 +53,7 @@ services:
       retries: 20
       start_period: 20s
 
-  # Emulador oficial do Azure Service Bus (filas em infra/servicebus/config.json)
+  # Official Azure Service Bus emulator (queues in infra/servicebus/config.json)
   servicebus:
     image: mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1
     environment:
@@ -94,7 +94,7 @@ services:
       jaeger:
         condition: service_started
     healthcheck:
-      # "healthy" só quando API, PostgreSQL e Service Bus estão prontos
+      # "healthy" only when the API, PostgreSQL and Service Bus are ready
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
       interval: 10s
       timeout: 10s
@@ -114,7 +114,7 @@ services:
       api:
         condition: service_healthy
     healthcheck:
-      # Heartbeat atualizado a cada 10 s
+      # Heartbeat refreshed every 10 s
       test: ["CMD-SHELL", "find /tmp/orders-worker.heartbeat -mmin -1 | grep -q ."]
       interval: 15s
       timeout: 5s
