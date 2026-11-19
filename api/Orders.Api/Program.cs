@@ -1,80 +1,95 @@
-using System.Linq;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using OrderApi.Data;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.OpenApi.Models;
+using Orders.Api.Ai;
+using Orders.Api.Health;
+using Orders.Api.Infrastructure;
+using Orders.Api.Realtime;
+using Orders.Core.Application;
+using Orders.Core.Infrastructure.Messaging;
+using Orders.Core.Infrastructure.Persistence;
+using Orders.Core.Observability;
+using OpenTelemetry.Trace;
 
 var builder = WebApplication.CreateBuilder(args);
+var configuration = builder.Configuration;
 
-builder.Services.AddDbContext<OrderContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
+var postgres = configuration.GetConnectionString("Postgres")
+    ?? throw new InvalidOperationException("ConnectionStrings:Postgres não configurada.");
+var messaging = configuration.GetMessagingOptions();
 
-builder.Services.AddControllers()
-    .AddJsonOptions(o =>
-    {
-        o.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-    });
-
-builder.Services.AddCors(options =>
+builder.Logging.Configure(options => options.ActivityTrackingOptions =
+    ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId);
+builder.Logging.AddSimpleConsole(options =>
 {
-    options.AddDefaultPolicy(policy =>
-    {
-        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
-    });
+    options.IncludeScopes = true;
+    options.SingleLine = true;
+    options.TimestampFormat = "HH:mm:ss ";
 });
 
-builder.Services.AddHealthChecks()
-    .AddNpgSql(builder.Configuration.GetConnectionString("Postgres"));
+// Domínio, aplicação e persistência
+builder.Services.AddOrdersPersistence(postgres).AddOrdersApplication();
 
-// Swagger
+// HTTP
+builder.Services
+    .AddControllers(options => options.ModelMetadataDetailsProviders.Add(new SystemTextJsonValidationMetadataProvider()))
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-var app = builder.Build();
-
-// Apply migrations
-using (var scope = app.Services.CreateScope())
+builder.Services.AddSwaggerGen(options =>
 {
-    var db = scope.ServiceProvider.GetRequiredService<OrderContext>();
-    db.Database.Migrate();
-}
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-else
-{
-    app.UseExceptionHandler("/error");
-}
-
-app.UseRouting();
-app.UseCors();
-app.UseAuthorization();
-
-// Mapeia endpoints
-app.MapControllers();
-
-app.MapHealthChecks("/health", new HealthCheckOptions
-{
-    ResponseWriter = async (context, report) =>
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Gestão de Pedidos API", Version = "v1" });
+    var xml = Path.Combine(AppContext.BaseDirectory, "Orders.Api.xml");
+    if (File.Exists(xml))
     {
-        context.Response.ContentType = "application/json";
-        var result = JsonSerializer.Serialize(new
-        {
-            status = report.Status.ToString(),
-            checks = report.Entries.Select(e => new
-            {
-                key = e.Key,
-                status = e.Value.Status.ToString(),
-                description = e.Value.Description,
-            })
-        });
-        await context.Response.WriteAsync(result);
+        options.IncludeXmlComments(xml);
     }
 });
 
-// Apenas **uma** chamada final a Run
-app.Run();
+// Tempo real
+builder.Services
+    .AddSignalR()
+    .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddSingleton<IOrderNotifier, SignalROrderNotifier>();
+
+// Health checks
+var healthChecks = builder.Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy("API em execução."), tags: [HealthEndpoints.LiveTag])
+    .AddNpgSql(postgres, name: "postgres", timeout: TimeSpan.FromSeconds(5));
+
+// Mensageria (Service Bus + outbox + consumidor de status)
+if (messaging.Enabled)
+{
+    builder.Services.AddServiceBusMessaging(configuration);
+    builder.Services.AddHostedService<StatusChangedConsumer>();
+    healthChecks.AddCheck<ServiceBusHealthCheck>("servicebus");
+}
+
+// Módulo IA (opcional: ativo só com ANTHROPIC_API_KEY)
+builder.Services.AddOrderAnalytics(configuration);
+
+// Observabilidade
+builder.Services.AddOrdersTelemetry(configuration, "orders-api", tracing => tracing
+    .AddAspNetCoreInstrumentation(options =>
+        options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))
+    .AddHttpClientInstrumentation());
+
+var app = builder.Build();
+
+app.UseExceptionHandler();
+app.UseStatusCodePages();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.MapControllers();
+app.MapHub<OrdersHub>(OrdersHub.Path);
+app.MapOrdersHealthChecks();
+
+await app.MigrateDatabaseAsync();
+await app.RunAsync();

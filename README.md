@@ -1,243 +1,340 @@
 # Gestão de Pedidos
 
-Sistema de exemplo para gerenciamento de pedidos composto por:
+[![CI](https://github.com/jotavfonseca/Gestao-de-Pedidos/actions/workflows/ci.yml/badge.svg)](https://github.com/jotavfonseca/Gestao-de-Pedidos/actions/workflows/ci.yml)
 
-* **API** em ASP.NET Core (.NET 8.0)
-* **Worker** (serviço em background) em .NET 8.0
-* **Banco de dados** PostgreSQL
-* **pgAdmin** para administração do banco
-* **Frontend** em React (Node 22)
+**Português** · [English](README.en.md)
 
----
+Sistema de gestão de pedidos com processamento assíncrono: a API grava o pedido
+e publica um evento no **Azure Service Bus**; um **worker** consome a mensagem,
+muda o status para *Processando* e, 5 segundos depois, para *Finalizado*. O
+frontend acompanha tudo em tempo real.
 
-## Índice
+Solução do desafio técnico **POC TMB** ([enunciado](docs/desafio-poc-tmb.md)).
+Todas as decisões estão especificadas em [`specs/`](specs/README.md) (Spec Driven Development).
 
-* [Sobre](#sobre)
-* [Pré-requisitos](#pré-requisitos)
-* [Variáveis de ambiente (`.env`)](#variáveis-de-ambiente-env)
-* [Rodando com Docker Compose](#rodando-com-docker-compose)
-* [Rodando localmente (sem Docker)](#rodando-localmente-sem-docker)
-* [Migrações e banco de dados](#migrações-e-banco-de-dados)
-* [Acessando o pgAdmin](#acessando-o-pgadmin)
-* [Testando a API](#testando-a-api)
-* [Comandos úteis](#comandos-úteis)
-* [Boas práticas de segurança](#boas-práticas-de-segurança)
-* [Contribuição](#contribuição)
+| | |
+|---|---|
+| **Backend** | .NET 8, ASP.NET Core, Entity Framework Core 8, PostgreSQL 16 |
+| **Mensageria** | Azure Service Bus (emulador oficial no Docker; namespace real por connection string) |
+| **Frontend** | React 19, Vite 7, Tailwind CSS 4, SignalR |
+| **Infra** | Docker Compose, pgAdmin, Jaeger (OpenTelemetry) |
+| **IA (opcional)** | Claude (SDK oficial da Anthropic para C#) |
 
----
+**Funcionalidades**
 
-## Sobre
-
-Implementação de exemplo para gestão de pedidos com separação entre API, worker, banco e frontend.
-
----
-
-## Pré-requisitos
-
-* Docker e Docker Compose (versões recentes)
-* .NET SDK 8.0
-* Node.js 22
-* Git (para clonar o repositório)
+- Criar, listar e detalhar pedidos (`POST /orders`, `GET /orders`, `GET /orders/{id}`).
+- Sequência obrigatória **Pendente → Processando → Finalizado**, garantida pelo domínio.
+- **Outbox Pattern**: pedido e mensagem gravados na mesma transação.
+- **Worker idempotente** (mensagens duplicadas, reentregas e entregas concorrentes).
+- `CorrelationId = OrderId` e `EventType = OrderCreated` em toda mensagem.
+- **Histórico de status** com linha do tempo na tela de detalhes.
+- **Tempo real com SignalR** e fallback automático para polling.
+- **Health checks** de API, banco e fila.
+- **Tracing ponta a ponta** (API → outbox → Service Bus → worker → API) no Jaeger.
+- **Pergunte sobre os pedidos**: perguntas em linguagem natural respondidas com dados reais.
+- Testes de domínio, arquitetura, **golden tests** e integração com **Testcontainers**.
 
 ---
 
-## Variáveis de ambiente (`.env`)
+## Sumário
 
-Crie um arquivo `.env` na raiz do repositório com as variáveis abaixo (substitua senhas por valores fortes quando for para produção):
-
-```env
-# Postgres
-POSTGRES_DB=ordersdb
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_PORT=5432
-
-# API / Worker (.NET)
-CONNECTION_STR=Host=postgres;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
-ASPNETCORE_ENVIRONMENT=Development
-
-# pgAdmin
-PGADMIN_DEFAULT_EMAIL=admin@admin.local
-PGADMIN_DEFAULT_PASSWORD=admin
-
-# Frontend
-REACT_APP_API_URL=http://api:80
-```
-
-Também mantenha um arquivo `.env.example` (sem segredos) para referência.
+1. [Como rodar](#como-rodar)
+2. [Endereços](#endereços)
+3. [Arquitetura](#arquitetura)
+4. [Arquitetura e DDD](#arquitetura-e-ddd)
+5. [API](#api)
+6. [Variáveis de ambiente](#variáveis-de-ambiente)
+7. [Rodar sem Docker](#rodar-sem-docker)
+8. [Testes](#testes)
+9. [Decisões de design](#decisões-de-design)
+10. [Requisitos do desafio × implementação](#requisitos-do-desafio--implementação)
+11. [Troubleshooting](#troubleshooting)
+12. [Estrutura de pastas](#estrutura-de-pastas)
 
 ---
 
-## Rodando com Docker Compose
+## Como rodar
 
-1. Coloque o `.env` na raiz do repositório.
-
-2. Suba todos os serviços:
+Pré-requisito: **Docker** com Docker Compose (Docker Desktop no Windows/macOS). Reserve ~4 GB de memória para o Docker: o emulador do Service Bus usa um SQL Server.
 
 ```bash
+cp .env.example .env
 docker compose up --build -d
 ```
 
-3. Verifique o status dos serviços:
+Na primeira vez o download das imagens leva alguns minutos. Acompanhe com `docker compose ps`: quando `api`, `worker` e `frontend` estiverem `healthy`, abra **http://localhost:3000**.
+
+Para ver o fluxo assíncrono: crie um pedido e observe o status mudar sozinho para *Processando* e, 5 s depois, *Finalizado*.
 
 ```bash
-docker compose ps
+docker compose logs -f worker   # acompanhar o processamento
+docker compose down             # parar (mantém os dados)
+docker compose down -v          # parar e apagar os dados
 ```
 
-4. Verifique logs (ex.: serviço `api`):
+> **Módulo de IA:** preencha `ANTHROPIC_API_KEY` no `.env` e rode `docker compose up -d api`. Sem a chave, o resto do sistema funciona normalmente e a tela "Pergunte" mostra que o módulo está desativado.
+
+## Endereços
+
+| Serviço | URL | Observação |
+|---|---|---|
+| Frontend | http://localhost:3000 | |
+| API (Swagger) | http://localhost:5000/swagger | Em `ASPNETCORE_ENVIRONMENT=Development` |
+| Health | http://localhost:5000/health | API + PostgreSQL + Service Bus |
+| pgAdmin | http://localhost:8080 | Login: `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD`; servidor já cadastrado (senha do banco: `POSTGRES_PASSWORD`) |
+| Jaeger | http://localhost:16686 | Serviços `orders-api` e `orders-worker` |
+| PostgreSQL | `localhost:5432` | |
+| Service Bus (AMQP) | `localhost:5672` | Emulador |
+
+## Arquitetura
+
+```mermaid
+flowchart LR
+    U([Usuário]) --> FE["Frontend<br/>React + nginx"]
+    FE -- "/api (REST)" --> API["API<br/>ASP.NET Core"]
+    FE <-. "/hubs (SignalR)" .-> API
+    API -- "EF Core" --> DB[(PostgreSQL)]
+    W["Worker<br/>.NET"] -- "EF Core" --> DB
+    API -- "outbox → order-created" --> SB{{Azure Service Bus}}
+    SB -- "order-created" --> W
+    W -- "outbox → order-status-changed" --> SB
+    SB -- "order-status-changed" --> API
+    API -. "tool use" .-> AI["Claude<br/>(opcional)"]
+    API & W -. "OTLP" .-> J[Jaeger]
+```
+
+Fluxo de um pedido:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant FE as Frontend
+    participant API
+    participant DB as PostgreSQL
+    participant SB as Service Bus
+    participant W as Worker
+
+    FE->>API: POST /orders
+    API->>DB: INSERT pedido + histórico + outbox (1 transação)
+    API-->>FE: 201 Created (Pendente)
+    API->>SB: outbox → OrderCreated (CorrelationId=OrderId)
+    SB->>W: OrderCreated
+    W->>DB: Processando + outbox OrderStatusChanged
+    W->>W: aguarda 5 s
+    W->>DB: Finalizado + outbox OrderStatusChanged
+    W->>SB: OrderStatusChanged (×2)
+    SB->>API: OrderStatusChanged
+    API-->>FE: SignalR "orderStatusChanged"
+```
+
+## Arquitetura e DDD
+
+O domínio é pequeno (um agregado, três status, uma regra central), então
+usamos **só os padrões táticos de DDD que resolvem problemas reais** — detalhes
+em [`specs/constitution.md` §4](specs/constitution.md).
+
+| Usamos | Onde |
+|---|---|
+| **Agregado rico** `Order`: setters privados, `Order.Create`, mudança de status só por `TransitionTo` | [`Domain/Orders/Order.cs`](shared/Orders.Core/Domain/Orders/Order.cs) |
+| **Value object** `Money`: valor positivo, 2 casas, igualdade por valor | [`Domain/Orders/Money.cs`](shared/Orders.Core/Domain/Orders/Money.cs) |
+| **Eventos de domínio** `OrderCreated`, `OrderStatusChanged` | [`Domain/Orders/Events/`](shared/Orders.Core/Domain/Orders/Events) |
+| **Camada de aplicação fina**: `CreateOrderHandler`, `OrderQueries`, `ProcessOrderHandler` | [`Application/Orders/`](shared/Orders.Core/Application/Orders) |
+| **Exceções de domínio** traduzidas para HTTP na borda (400 / 409) | [`DomainExceptionHandler.cs`](api/Orders.Api/Infrastructure/DomainExceptionHandler.cs) |
+
+Deixados de fora de propósito: repositórios genéricos sobre o EF (o `DbContext`
+já é unidade de trabalho), MediatR/CQRS formal (três casos de uso), um projeto
+por camada (as pastas de `Orders.Core` bastam, e um
+[teste de arquitetura](tests/Orders.Tests/Architecture/LayeringTests.cs) garante
+que o domínio não depende de EF nem do Service Bus) e bounded contexts.
+
+**Agregado → evento → outbox → fila:** o agregado registra o evento; um
+`SaveChangesInterceptor` converte cada evento em `OutboxMessage` na mesma
+transação; o `OutboxPublisher` envia para o Service Bus. Nenhum caso de uso
+escreve código de mensageria.
+
+```mermaid
+flowchart LR
+    A["Order.TransitionTo()"] -->|registra| E[OrderStatusChanged]
+    E -->|SaveChanges + interceptor| O[(OutboxMessages)]
+    O -->|OutboxPublisher| Q[[order-status-changed]]
+```
+
+## API
+
+| Método | Rota | Descrição | Respostas |
+|---|---|---|---|
+| `POST` | `/orders` | Cria pedido (`cliente`, `produto`, `valor`) | 201, 400 |
+| `GET` | `/orders` | Lista pedidos (mais recentes primeiro) | 200 |
+| `GET` | `/orders/{id}` | Detalhes + histórico | 200, 404 |
+| `POST` | `/orders/ask` | Pergunta em linguagem natural (IA) | 200, 400, 502, 503 |
+| `GET` | `/orders/ask/status` | Módulo de IA ativo? | 200 |
+| `GET` | `/health/live` | Processo da API | 200 |
+| `GET` | `/health/ready`, `/health` | API + PostgreSQL + Service Bus | 200, 503 |
+| — | `/hubs/orders` | SignalR: evento `orderStatusChanged` | |
 
 ```bash
-docker compose logs -f api
+curl -X POST http://localhost:5000/orders \
+  -H "Content-Type: application/json" \
+  -d '{"cliente":"Ana Souza","produto":"Teclado mecânico","valor":349.90}'
 ```
 
-5. Parar e remover containers (mantendo volumes):
+```json
+{
+  "id": "4f0c6c8e-2d3b-4a8e-9a51-1f2e3d4c5b6a",
+  "cliente": "Ana Souza",
+  "produto": "Teclado mecânico",
+  "valor": 349.90,
+  "status": "Pendente",
+  "dataCriacao": "2026-11-19T13:00:00+00:00",
+  "historico": [{ "status": "Pendente", "data": "2026-11-19T13:00:00+00:00" }]
+}
+```
+
+- Os atributos seguem o enunciado em camelCase (`data_criacao` → `dataCriacao`).
+- `status` e `dataCriacao` são definidos pelo servidor; se o cliente enviar `status`, ele é ignorado.
+- Erros seguem [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) (`application/problem+json`), com erros por campo no `400`.
+- Mais exemplos em [`Orders.Api.http`](api/Orders.Api/Orders.Api.http).
+
+**Mensagens no Service Bus**
+
+| Fila | `EventType` / `Subject` | `CorrelationId` | Corpo |
+|---|---|---|---|
+| `order-created` | `OrderCreated` | `OrderId` | `{ orderId, cliente, produto, valor, dataCriacao }` |
+| `order-status-changed` | `OrderStatusChanged` | `OrderId` | `{ orderId, statusAnterior, status, changedAt }` |
+
+`MessageId` é o id da mensagem no outbox, e `traceparent` vai nas *application properties*.
+
+## Variáveis de ambiente
+
+Todas em [`.env.example`](.env.example). As principais:
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `POSTGRES_DB` / `POSTGRES_USER` / `POSTGRES_PASSWORD` | `ordersdb` / `postgres` / `postgres` | Banco |
+| `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` | `admin@example.com` / `admin` | pgAdmin |
+| `ACCEPT_EULA` | `Y` | Aceite das licenças do emulador e do SQL Server |
+| `MSSQL_SA_PASSWORD` | `Orders_Passw0rd!` | SQL Server do emulador |
+| `SERVICEBUS_CONNECTION_STRING` | emulador | Troque pela connection string de um namespace real para usar o Azure |
+| `WORKER_PROCESSING_DELAY_SECONDS` | `5` | Tempo entre Processando e Finalizado |
+| `ANTHROPIC_API_KEY` | vazio | Ativa o módulo de IA |
+| `API_PORT`, `FRONTEND_PORT`, `PGADMIN_PORT`, `POSTGRES_PORT`, `JAEGER_UI_PORT` | 5000, 3000, 8080, 5432, 16686 | Portas no host |
+
+**Azure real:** crie as filas `order-created` e `order-status-changed` no namespace e defina
+`SERVICEBUS_CONNECTION_STRING`. Nenhum código muda.
+
+## Rodar sem Docker
+
+Requer .NET SDK 8, Node 20+ e um PostgreSQL e um Service Bus acessíveis. O jeito mais simples é subir só a infraestrutura pelo Compose:
 
 ```bash
-docker compose down
+docker compose up -d postgres sqlserver servicebus jaeger
+
+# API (aplica as migrations ao iniciar) — http://localhost:5000/swagger
+dotnet run --project api/Orders.Api
+
+# Worker (outro terminal)
+dotnet run --project worker/Orders.Worker
+
+# Frontend (outro terminal) — http://localhost:5173 (proxy para a API em :5000)
+cd frontend && npm install && npm run dev
 ```
 
-6. Parar e remover containers e volumes (remove dados do banco):
+As connection strings de desenvolvimento estão em `appsettings.Development.json` (apontam para `localhost`).
+Para enviar traces localmente, defina `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317` (a porta 4317 do Jaeger não é publicada por padrão; adicione-a ao Compose se precisar).
 
-```bash
-docker compose down -v
-```
-
----
-
-## Rodando localmente (sem Docker)
-
-### Banco
-
-Instale e execute PostgreSQL localmente ou use uma instância remota. Ajuste `CONNECTION_STR` para apontar para `localhost` e porta correta.
-
-### API / Worker (.NET 8.0)
-
-Navegue até a pasta do projeto da API e do worker. Configure as variáveis de ambiente:
-
-Linux / macOS (bash):
-
-```bash
-export CONNECTION_STR='Host=localhost;Database=ordersdb;Username=postgres;Password=postgres;Port=5432'
-export ASPNETCORE_ENVIRONMENT=Development
-```
-
-Windows PowerShell:
-
-```powershell
-$env:CONNECTION_STR = 'Host=localhost;Database=ordersdb;Username=postgres;Password=postgres;Port=5432'
-$env:ASPNETCORE_ENVIRONMENT = 'Development'
-```
-
-Restaurar dependências e executar:
-
-```bash
-dotnet restore
-dotnet build
-dotnet run --project ./src/Api/Api.csproj
-```
-
-Worker:
-
-```bash
-dotnet run --project ./src/Worker/Worker.csproj
-```
-
-### Frontend (React + Node 22)
-
-Navegue até a pasta do frontend, instale dependências e execute:
-
-```bash
-npm install
-npm start
-```
-
-O frontend normalmente ficará disponível em `http://localhost:3000`.
-
----
-
-## Migrações e banco de dados
-
-Se o projeto usa Entity Framework Core e contém migrations, aplique-as:
-
-1. No ambiente local (com .NET SDK instalado):
+**Migrations** (ferramenta fixada em `.config/dotnet-tools.json`):
 
 ```bash
 dotnet tool restore
-dotnet ef database update --project ./src/Api/Api.csproj --startup-project ./src/Api/Api.csproj
+dotnet ef migrations add NomeDaMigration --project shared/Orders.Core --output-dir Infrastructure/Persistence/Migrations
 ```
 
-2. Dentro do container (após `docker compose up`):
+## Testes
 
 ```bash
-docker compose exec api dotnet ef database update
+dotnet test                     # todos os testes (.NET)
+cd frontend && npm run lint && npm run build
 ```
 
-Verifique os logs da API para confirmar aplicação de migrations automáticas (se implementado).
+| Suíte | O que cobre | Precisa de Docker |
+|---|---|---|
+| `Domain/` | Sequência de status, histórico, eventos, `Money` | Não |
+| `Architecture/` | Domínio sem EF/Npgsql/Azure; aplicação sem Service Bus | Não |
+| `Golden/` | JSON da API e das mensagens comparados com [`Golden/files`](tests/Orders.Tests/Golden/files) | Não |
+| `Infrastructure/` | Outbox na mesma transação, rollback, status como texto, concorrência (`xmin`) | Sim |
+| `Application/` | Idempotência: duplicata, reentrega em Processando, entregas concorrentes | Sim |
+| `Worker/` | Validação de mensagem e dead-letter | Sim |
+| `Api/` | Endpoints HTTP reais (`WebApplicationFactory`) | Sim |
+| `Ai/` | Ferramentas do módulo IA com dados conhecidos e fuso horário | Sim |
 
----
+Os testes de integração sobem um PostgreSQL com **Testcontainers**; sem Docker eles são **pulados** com aviso, e o resto roda normalmente.
 
-## Acessando o pgAdmin
+**CI:** a cada push e pull request para `main`, o [GitHub Actions](.github/workflows/ci.yml) roda o build e todos os testes .NET (com Testcontainers), o lint e o build do frontend e o build das imagens Docker.
 
-* URL: conforme mapeamento do `docker-compose.yml` (ex.: `http://localhost:8080`).
-* Usuário: `PGADMIN_DEFAULT_EMAIL` do `.env`.
-* Senha: `PGADMIN_DEFAULT_PASSWORD` do `.env`.
+**Golden tests:** se você mudar um contrato de propósito, regenere com `UPDATE_GOLDEN=1 dotnet test` e revise o diff dos arquivos `.json`.
 
-Ao adicionar um servidor no pgAdmin, configure:
+## Decisões de design
 
-* Host: `postgres` (quando em Docker Compose)
-* Port: `5432`
-* Username / Password: conforme `.env`
+- **Outbox Pattern** — evita o *dual write* (banco gravou e fila não, ou vice-versa). Um publicador em background lê o outbox com `FOR UPDATE SKIP LOCKED`; ele roda na API **e** no worker, então qualquer um escoa as mensagens pendentes. Entrega *at-least-once*: falhas incrementam `Attempts`/`LastError` e a mensagem é reenviada quando o Service Bus volta.
+- **Idempotência no worker** — máquina de estados + concorrência otimista (coluna `xmin` do PostgreSQL). O estado atual decide o que fazer (Finalizado = ignora; Processando = retoma) e duas entregas simultâneas não conseguem fazer a mesma transição. Não há tabela de "mensagens processadas" porque cada transição só pode ocorrer uma vez.
+- **Dead-letter** — `EventType` inesperado, corpo inválido ou pedido inexistente vão direto para a DLQ; erros transitórios são reentregues até `MaxDeliveryCount` (5).
+- **Emulador do Service Bus** — o projeto roda sem conta Azure. O health check da fila usa *peek* (operação de dados), porque o emulador não suporta as APIs de administração usadas pelos checks prontos. A imagem do emulador é fixada (`2.0.1`) para builds reproduzíveis.
+- **Tempo real** — o worker não chama a API: publica `OrderStatusChanged` (pelo outbox) e a API repassa via SignalR. O SignalR negocia WebSocket → SSE → long polling, e o frontend faz polling a cada 5 s enquanto estiver desconectado (indicador "Tempo real / Polling" no topo). Com várias instâncias da API, a fila deveria virar um *topic* com uma *subscription* por instância (ou Azure SignalR Service).
+- **Mesma origem no navegador** — o nginx (Docker) e o Vite (dev) fazem proxy de `/api` e `/hubs`, então não há CORS nem URL de API fixa no frontend.
+- **Segurança do módulo de IA** — o Claude não escreve SQL: só chama 5 ferramentas fixas, somente leitura, com parâmetros validados (status, período, limite). Datas relativas são interpretadas no fuso `America/Sao_Paulo`. Limite de 6 rodadas de ferramentas por pergunta, fallback de recusa no servidor e erros da Anthropic traduzidos para 502/503 sem vazar detalhes.
+- **Tracing** — o `traceparent` é salvo no outbox junto com a mensagem, então o trace atravessa a fila mesmo quando o envio acontece depois, em outro processo.
 
----
+## Requisitos do desafio × implementação
 
-## Testando a API
+| Requisito | Implementação | Spec |
+|---|---|---|
+| `POST/GET /orders`, `GET /orders/{id}` | [`OrdersController`](api/Orders.Api/Controllers/OrdersController.cs) | [02](specs/02-api-rest.md) |
+| Atributos e status do pedido; sequência obrigatória | [`Order`](shared/Orders.Core/Domain/Orders/Order.cs) | [01](specs/01-base-compartilhada.md) |
+| Persistir com EF + publicar no Service Bus | Interceptor + [`OutboxPublisher`](shared/Orders.Core/Infrastructure/Outbox/OutboxPublisher.cs) | [03](specs/03-outbox-service-bus.md) |
+| Worker: Processando → 5 s → Finalizado | [`ProcessOrderHandler`](shared/Orders.Core/Application/Orders/ProcessOrder.cs) | [04](specs/04-worker-idempotente.md) |
+| Consumidor idempotente | Estado + `xmin`; testes em [`ProcessOrderTests`](tests/Orders.Tests/Application/ProcessOrderTests.cs) | [04](specs/04-worker-idempotente.md) |
+| `CorrelationId=OrderId`, `EventType=OrderCreated` | `OutboxPublisher.SendAsync` | [03](specs/03-outbox-service-bus.md) |
+| Health checks de API, banco e fila | [`HealthEndpoints`](api/Orders.Api/Health/HealthEndpoints.cs) | [05](specs/05-health-checks.md) |
+| Tabela responsiva, formulário, detalhes, feedback de status | [`frontend/src/pages`](frontend/src/pages) | [09](specs/09-frontend.md) |
+| Compose com API, Worker, Frontend, PostgreSQL, PgAdmin; `.env`; healthchecks | [`docker-compose.yml`](docker-compose.yml) | [11](specs/11-infraestrutura.md) |
+| Migrations automáticas | [`DatabaseMigrator`](api/Orders.Api/Infrastructure/DatabaseMigrator.cs) | [02](specs/02-api-rest.md) |
+| Bônus: Outbox (+3) | Interceptor + publicador | [03](specs/03-outbox-service-bus.md) |
+| Bônus: Histórico de status (+3) | `OrderStatusHistory` + linha do tempo | [07](specs/07-historico-status.md) |
+| Bônus: SignalR com fallback (+3) | [`OrdersHub`](api/Orders.Api/Realtime/OrdersHub.cs), [`RealtimeProvider`](frontend/src/realtime/RealtimeProvider.jsx) | [06](specs/06-signalr-fallback.md) |
+| Bônus: Testcontainers (+1) | [`PostgresFixture`](tests/Orders.Tests/Infrastructure/PostgresFixture.cs) | [12](specs/12-testes.md) |
+| Bônus: Tracing ponta a ponta (+2) | OpenTelemetry + Jaeger | [08](specs/08-tracing.md) |
+| Bônus: Golden tests (+2) | [`ContractGoldenTests`](tests/Orders.Tests/Golden/ContractGoldenTests.cs) | [12](specs/12-testes.md) |
+| Bônus: IA/Analytics com LLM (+5) | [`api/Orders.Api/Ai`](api/Orders.Api/Ai), tela "Pergunte" | [10](specs/10-modulo-ia.md) |
+| README, `.env` de exemplo, diagramas | Este arquivo, [`.env.example`](.env.example) | [13](specs/13-documentacao.md) |
 
-* Swagger (se exposto em Development): `http://<host_da_api>/swagger`
+## Troubleshooting
 
-Exemplos de `curl` (ajuste endpoints conforme implementados):
+| Sintoma | Causa provável / solução |
+|---|---|
+| `api` demora a ficar `healthy` | Na primeira subida o SQL Server e o emulador levam 1–2 min. Veja `docker compose logs servicebus`. |
+| `servicebus` reinicia ou `sqlserver` cai | Pouca memória para o Docker (o SQL Server pede ~2 GB) ou `MSSQL_SA_PASSWORD` fraca (precisa de maiúscula, minúscula, número e símbolo). |
+| Postgres: *database files are incompatible with server* | Volume de uma versão anterior do PostgreSQL. Este projeto usa o volume `orders_pgdata`; para recomeçar do zero: `docker compose down -v`. |
+| Pedido fica em *Pendente* | Service Bus indisponível: o outbox guarda a mensagem e reenvia. Confira `curl localhost:5000/health/ready` e a tabela `OutboxMessages` (`Attempts`, `LastError`). |
+| Indicador mostra "Polling" | A conexão SignalR caiu; o frontend continua atualizando a cada 5 s e reconecta sozinho. |
+| "Módulo de IA desativado" | Defina `ANTHROPIC_API_KEY` no `.env` e rode `docker compose up -d api`. |
+| Porta em uso | Ajuste `API_PORT`, `FRONTEND_PORT` etc. no `.env`. |
+| Testes de integração pulados | Docker não está rodando. |
 
-```bash
-curl http://localhost/api/orders
+## Estrutura de pastas
 
-curl -X POST http://localhost/api/orders -H "Content-Type: application/json" -d '{"customer":"João","items":[]}'
 ```
-
----
-
-## Comandos úteis
-
-```bash
-# Subir e rebuild
-docker compose up --build -d
-
-# Logs do serviço api
-docker compose logs -f api
-
-# Executar migrations no container
-docker compose exec api dotnet ef database update
-
-# Parar e remover containers + volumes
-docker compose down -v
+api/Orders.Api/          API REST, SignalR, health checks, módulo de IA
+worker/Orders.Worker/    Consumidor do Service Bus
+shared/Orders.Core/
+  Domain/                Agregado Order, Money, eventos de domínio (sem infraestrutura)
+  Application/           Casos de uso (criar, consultar, processar)
+  Contracts/             Mensagens publicadas no Service Bus
+  Infrastructure/        EF Core, migrations, outbox, Service Bus
+  Observability/         OpenTelemetry
+tests/Orders.Tests/      Unitários, arquitetura, golden, integração (Testcontainers)
+frontend/                React + Tailwind (Vite), nginx
+infra/                   Configuração do emulador do Service Bus e do pgAdmin
+specs/                   Especificações (Spec Driven Development)
+docs/                    Enunciado do desafio
+.github/workflows/       CI (GitHub Actions)
 ```
-
----
-
-## Boas práticas de segurança
-
-* **Não versionar** o arquivo `.env`. Adicione `.env` ao `.gitignore`.
-* Mantenha um `.env.example` sem segredos.
-* Use senhas fortes para `POSTGRES_PASSWORD` e `PGADMIN_DEFAULT_PASSWORD`.
-* Em produção, utilize um gerenciador de segredos (ex.: Vault, AWS Secrets Manager, Azure Key Vault).
-* Separe credenciais entre serviços (não reutilize a mesma senha para múltiplos serviços).
-
----
-
-## Contribuição
-
-Siga o fluxo padrão: abra issues descrevendo o problema/feature, crie branches com mudanças claras e envie pull requests com descrição e instruções de teste.
-
----
-
-## Licença
-
-Adicione a licença do projeto, se aplicável.
