@@ -1,20 +1,24 @@
-# Visual Studio
+# IDEs
 .vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
 *.user
 *.suo
 
-# Build outputs
+# Build
 bin/
 obj/
+TestResults/
 
-# Docker
-*.env
+# Variáveis de ambiente (o exemplo é versionado)
+.env
+.env.*
+!.env.example
 
-# Node / Frontend
+# Node / frontend
 node_modules/
 dist/
-build/
 
 # Logs
 *.log
-
