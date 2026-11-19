@@ -1,49 +1,49 @@
-# 08 — Tracing ponta a ponta
+# 08 — End-to-end tracing
 
-- **Status:** Concluída
-- **Pontuação:** bônus **Tracing ponta-a-ponta (+2)**
+- **Status:** Done
+- **Score:** bonus **End-to-end tracing (+2)**
 
-## Contexto
+## Context
 
-Não há nenhuma telemetria. Com outbox e fila, um pedido passa por API →
-banco → publicador → Service Bus → worker → fila de status → API → navegador;
-sem tracing é difícil enxergar onde está a demora ou o erro.
+There was no telemetry. With an outbox and queues, an order goes through API →
+database → publisher → Service Bus → worker → status queue → API → browser; without
+tracing it is hard to see where a delay or an error happens.
 
-## Requisitos
+## Requirements
 
-- Tracing ponta a ponta — desafio §5.
+- End-to-end tracing — challenge §5.
 
-## Critérios de aceite
+## Acceptance criteria
 
-1. **Dado** um `POST /orders`, **então** no Jaeger existe **um único trace** contendo: requisição HTTP, comando SQL do insert, publicação do outbox, processamento no worker (com as duas atualizações SQL) e a publicação de `OrderStatusChanged`.
-2. Os spans de mensageria têm atributos `messaging.system = servicebus`, `messaging.destination.name`, `messaging.message.id` e `order.id`.
-3. **Dado** `OTEL_EXPORTER_OTLP_ENDPOINT` vazio, **então** API e worker funcionam normalmente, sem tentar exportar.
-4. Logs de API e worker incluem `TraceId` para correlacionar com o Jaeger.
+1. **Given** a `POST /orders`, **then** Jaeger shows **a single trace** containing: the HTTP request, the insert SQL, the outbox publish, the worker processing (with both SQL updates) and the `OrderStatusChanged` publish.
+2. Messaging spans have `messaging.system = servicebus`, `messaging.destination.name`, `messaging.message.id` and `order.id`.
+3. **Given** an empty `OTEL_EXPORTER_OTLP_ENDPOINT`, **then** the API and worker run normally without trying to export.
+4. API and worker logs include the `TraceId` to correlate with Jaeger.
 
 ## Design
 
-- Pacotes: `OpenTelemetry.Extensions.Hosting`, `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http`, `OpenTelemetry.Exporter.OpenTelemetryProtocol`, `Npgsql.OpenTelemetry`.
-- `ActivitySource("Orders.Messaging")` em `Orders.Core/Observability/Telemetry.cs`.
-- **Propagação pelo outbox**: o `DomainEventsToOutboxInterceptor` (spec 01) salva o `traceparent` da `Activity` atual em `OutboxMessage.TraceParent` — vale para a API e para o worker sem código extra nos casos de uso. O publicador cria o span `publish order-created` como filho desse contexto e grava `traceparent` em `ApplicationProperties`. O worker extrai e abre `process order-created` como filho.
-- O mesmo vale para `OrderStatusChanged` (worker → API).
-- Jaeger `all-in-one` no Compose recebendo OTLP (gRPC 4317), UI em `:16686`.
-- Nome de serviço: `orders-api` e `orders-worker`.
+- Packages: `OpenTelemetry.Extensions.Hosting`, `OpenTelemetry.Instrumentation.AspNetCore`, `OpenTelemetry.Instrumentation.Http`, `OpenTelemetry.Exporter.OpenTelemetryProtocol`, `Npgsql.OpenTelemetry`.
+- `ActivitySource("Orders.Messaging")` in `Orders.Core/Observability/Telemetry.cs`.
+- **Propagation through the outbox**: `DomainEventsToOutboxInterceptor` (spec 01) stores the current `Activity`'s `traceparent` in `OutboxMessage.TraceParent` — for both the API and the worker, with no extra code in the use cases. The publisher creates the `publish order-created` span as a child of that context and writes `traceparent` into `ApplicationProperties`. The worker extracts it and opens `process order-created` as a child.
+- The same applies to `OrderStatusChanged` (worker → API).
+- Jaeger `all-in-one` in Compose receiving OTLP (gRPC 4317), UI on `:16686`.
+- Service names: `orders-api` and `orders-worker`.
 
 ## Tasks
 
-- [x] 8.1 OpenTelemetry na API e no worker, condicionado ao endpoint OTLP.
-- [x] 8.2 `TraceParent` no outbox e propagação nas duas filas.
-- [x] 8.3 Atributos de mensageria nos spans.
-- [x] 8.4 Jaeger no Compose (junto da spec 11).
-- [x] 8.5 `TraceId` no escopo de log.
+- [x] 8.1 OpenTelemetry in the API and the worker, conditional on the OTLP endpoint.
+- [x] 8.2 `TraceParent` in the outbox and propagation over both queues.
+- [x] 8.3 Messaging attributes on the spans.
+- [x] 8.4 Jaeger in Compose (with spec 11).
+- [x] 8.5 `TraceId` in the log scope.
 
-## Verificação
+## Verification
 
-- Compose no ar → criar pedido → Jaeger `http://localhost:16686` → serviço `orders-api` → abrir o trace e conferir os spans do critério 1.
-- Critério 3: rodar a API localmente sem a variável e conferir que sobe sem erros.
+- Compose running → create an order → Jaeger `http://localhost:16686` → service `orders-api` → open the trace and check the spans in criterion 1.
+- Criterion 3: run the API locally without the variable and check it starts without errors.
 
-## Notas de implementação
+## Implementation notes
 
-- Verificado no Jaeger: um único trace com `POST orders`, SQL (`ordersdb`), `publish order-created`, `process order-created`, `publish order-status-changed` e `process order-status-changed`, cobrindo `orders-api` e `orders-worker`.
-- Como o publicador do outbox roda nos dois processos (spec 03), o span `publish` pode aparecer sob qualquer um dos serviços.
-- Logs no formato de uma linha com `TraceId`/`SpanId` e escopo `Queue/MessageId/OrderId/Delivery`.
+- Verified in Jaeger: a single trace with `POST orders`, SQL (`ordersdb`), `publish order-created`, `process order-created`, `publish order-status-changed` and `process order-status-changed`, spanning `orders-api` and `orders-worker`.
+- Because the outbox publisher runs in both processes (spec 03), a `publish` span may show up under either service.
+- Single-line logs with `TraceId`/`SpanId` and a `Queue/MessageId/OrderId/Delivery` scope.

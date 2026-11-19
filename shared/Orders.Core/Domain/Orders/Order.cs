@@ -4,52 +4,52 @@ using Orders.Core.Domain.Orders.Events;
 namespace Orders.Core.Domain.Orders;
 
 /// <summary>
-/// Agregado Pedido. Garante a sequência obrigatória de status
-/// (Pendente → Processando → Finalizado), registra o histórico e
-/// emite eventos de domínio a cada mudança.
+/// Order aggregate. Enforces the mandatory status sequence
+/// (Pending → Processing → Completed), records the status history and
+/// raises a domain event on every change.
 /// </summary>
 public sealed class Order : AggregateRoot
 {
     public const int MaxTextLength = 100;
 
-    private readonly List<OrderStatusHistory> _historico = [];
+    private readonly List<OrderStatusHistory> _statusHistory = [];
 
     public Guid Id { get; private set; }
-    public string Cliente { get; private set; } = null!;
-    public string Produto { get; private set; } = null!;
-    public Money Valor { get; private set; } = null!;
+    public string Customer { get; private set; } = null!;
+    public string Product { get; private set; } = null!;
+    public Money Amount { get; private set; } = null!;
     public OrderStatus Status { get; private set; }
-    public DateTimeOffset DataCriacao { get; private set; }
-    public IReadOnlyCollection<OrderStatusHistory> Historico => _historico.AsReadOnly();
+    public DateTimeOffset CreatedAt { get; private set; }
+    public IReadOnlyCollection<OrderStatusHistory> StatusHistory => _statusHistory.AsReadOnly();
 
     private Order()
     {
     }
 
-    public static Order Create(string cliente, string produto, Money valor, DateTimeOffset agora)
+    public static Order Create(string customer, string product, Money amount, DateTimeOffset now)
     {
-        ArgumentNullException.ThrowIfNull(valor);
+        ArgumentNullException.ThrowIfNull(amount);
 
         var order = new Order
         {
             Id = Guid.NewGuid(),
-            Cliente = RequireText(cliente, "cliente"),
-            Produto = RequireText(produto, "produto"),
-            Valor = valor,
-            Status = OrderStatus.Pendente,
-            DataCriacao = agora
+            Customer = RequireText(customer, "customer"),
+            Product = RequireText(product, "product"),
+            Amount = amount,
+            Status = OrderStatus.Pending,
+            CreatedAt = now
         };
 
-        order._historico.Add(new OrderStatusHistory(order.Id, OrderStatus.Pendente, agora));
-        order.Raise(new OrderCreated(order.Id, order.Cliente, order.Produto, valor.Amount, agora));
+        order._statusHistory.Add(new OrderStatusHistory(order.Id, OrderStatus.Pending, now));
+        order.Raise(new OrderCreated(order.Id, order.Customer, order.Product, amount.Value, now));
         return order;
     }
 
     public bool CanTransitionTo(OrderStatus next) =>
-        (Status, next) is (OrderStatus.Pendente, OrderStatus.Processando)
-                       or (OrderStatus.Processando, OrderStatus.Finalizado);
+        (Status, next) is (OrderStatus.Pending, OrderStatus.Processing)
+                       or (OrderStatus.Processing, OrderStatus.Completed);
 
-    public void TransitionTo(OrderStatus next, DateTimeOffset agora)
+    public void TransitionTo(OrderStatus next, DateTimeOffset now)
     {
         if (!CanTransitionTo(next))
         {
@@ -58,21 +58,23 @@ public sealed class Order : AggregateRoot
 
         var previous = Status;
         Status = next;
-        _historico.Add(new OrderStatusHistory(Id, next, agora));
-        Raise(new OrderStatusChanged(Id, previous, next, agora));
+        _statusHistory.Add(new OrderStatusHistory(Id, next, now));
+        Raise(new OrderStatusChanged(Id, previous, next, now));
     }
 
     private static string RequireText(string? value, string field)
     {
         var trimmed = value?.Trim();
+        var label = char.ToUpperInvariant(field[0]) + field[1..];
+
         if (string.IsNullOrEmpty(trimmed))
         {
-            throw new DomainValidationException(field, $"O campo '{field}' é obrigatório.");
+            throw new DomainValidationException(field, $"{label} is required.");
         }
 
         if (trimmed.Length > MaxTextLength)
         {
-            throw new DomainValidationException(field, $"O campo '{field}' deve ter no máximo {MaxTextLength} caracteres.");
+            throw new DomainValidationException(field, $"{label} must be at most {MaxTextLength} characters.");
         }
 
         return trimmed;

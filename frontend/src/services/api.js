@@ -1,10 +1,10 @@
-// Base relativa: o proxy (Vite em dev, nginx no Docker) encaminha /api para a API.
+// Relative base: the proxy (Vite in dev, nginx in Docker) forwards /api to the API.
 const BASE = '/api'
 
-/** Erro de API com os dados do ProblemDetails retornado pelo backend. */
+/** API error carrying the ProblemDetails returned by the backend. */
 export class ApiError extends Error {
   constructor(status, problem) {
-    super(problem?.detail || problem?.title || `Erro ${status}`)
+    super(problem?.detail || problem?.title || `Error ${status}`)
     this.name = 'ApiError'
     this.status = status
     this.title = problem?.title
@@ -21,7 +21,7 @@ async function request(path, options = {}) {
       headers: { Accept: 'application/json', ...options.headers },
     })
   } catch {
-    throw new ApiError(0, { title: 'Não foi possível conectar à API. Verifique se ela está em execução.' })
+    throw new ApiError(0, { title: 'Could not reach the API. Make sure it is running.' })
   }
 
   const isJson = response.headers.get('content-type')?.includes('json')

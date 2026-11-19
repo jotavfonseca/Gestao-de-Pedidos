@@ -11,7 +11,7 @@ bin/
 obj/
 TestResults/
 
-# Variáveis de ambiente (o exemplo é versionado)
+# Environment variables (the example file is versioned)
 .env
 .env.*
 !.env.example

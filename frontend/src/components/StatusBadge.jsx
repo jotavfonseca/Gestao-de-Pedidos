@@ -2,7 +2,7 @@ import { STATUS_STYLES } from './status'
 
 export default function StatusBadge({ status }) {
   const style = STATUS_STYLES[status] ?? { badge: 'bg-slate-100 text-slate-700 ring-slate-200', dot: 'bg-slate-400' }
-  const processing = status === 'Processando'
+  const processing = status === 'Processing'
 
   return (
     <span

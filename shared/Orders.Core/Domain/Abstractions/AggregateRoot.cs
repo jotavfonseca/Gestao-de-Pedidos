@@ -1,8 +1,8 @@
 namespace Orders.Core.Domain.Abstractions;
 
 /// <summary>
-/// Raiz de agregado: registra eventos de domínio que a infraestrutura
-/// converte em mensagens de outbox ao salvar (ver DomainEventsToOutboxInterceptor).
+/// Aggregate root: records domain events that the infrastructure turns into
+/// outbox messages on save (see DomainEventsToOutboxInterceptor).
 /// </summary>
 public abstract class AggregateRoot
 {

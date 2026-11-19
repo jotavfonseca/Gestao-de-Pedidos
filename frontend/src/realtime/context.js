@@ -1,11 +1,11 @@
 import { createContext, useContext } from 'react'
 
 /**
- * Estado da conexão SignalR:
- * - 'connecting'  : primeira tentativa
- * - 'connected'   : tempo real ativo
- * - 'reconnecting': caiu e está tentando voltar (fallback de polling ativo)
- * - 'disconnected': sem conexão (fallback de polling ativo)
+ * SignalR connection state:
+ * - 'connecting'  : first attempt
+ * - 'connected'   : real time active
+ * - 'reconnecting': dropped and trying to come back (polling fallback active)
+ * - 'disconnected': no connection (polling fallback active)
  */
 export const RealtimeContext = createContext({
   status: 'disconnected',

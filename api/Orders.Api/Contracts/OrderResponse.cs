@@ -5,21 +5,21 @@ namespace Orders.Api.Contracts;
 
 public sealed record OrderResponse(
     Guid Id,
-    string Cliente,
-    string Produto,
-    decimal Valor,
+    string Customer,
+    string Product,
+    decimal Amount,
     OrderStatus Status,
-    DateTimeOffset DataCriacao,
-    IReadOnlyList<StatusHistoryResponse> Historico)
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<StatusHistoryResponse> StatusHistory)
 {
     public static OrderResponse From(OrderDto order) => new(
         order.Id,
-        order.Cliente,
-        order.Produto,
-        order.Valor,
+        order.Customer,
+        order.Product,
+        order.Amount,
         order.Status,
-        order.DataCriacao,
-        order.Historico.Select(h => new StatusHistoryResponse(h.Status, h.Data)).ToList());
+        order.CreatedAt,
+        order.StatusHistory.Select(h => new StatusHistoryResponse(h.Status, h.ChangedAt)).ToList());
 }
 
-public sealed record StatusHistoryResponse(OrderStatus Status, DateTimeOffset Data);
+public sealed record StatusHistoryResponse(OrderStatus Status, DateTimeOffset ChangedAt);

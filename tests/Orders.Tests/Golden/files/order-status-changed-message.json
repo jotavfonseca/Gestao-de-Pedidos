@@ -1,6 +1,6 @@
 {
   "orderId": "4f0c6c8e-2d3b-4a8e-9a51-1f2e3d4c5b6a",
-  "statusAnterior": "Processando",
-  "status": "Finalizado",
+  "previousStatus": "Processing",
+  "status": "Completed",
   "changedAt": "2026-11-19T13:00:06+00:00"
 }

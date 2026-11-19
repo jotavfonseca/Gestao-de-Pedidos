@@ -6,9 +6,9 @@ using Orders.Core.Domain.Abstractions;
 namespace Orders.Core.Infrastructure.Outbox;
 
 /// <summary>
-/// Antes de cada SaveChanges, converte os eventos de domínio dos agregados
-/// rastreados em <see cref="OutboxMessage"/>. Assim agregado e mensagem são
-/// gravados na mesma transação, sem código de mensageria nos casos de uso.
+/// Before each SaveChanges, turns the domain events of tracked aggregates into
+/// <see cref="OutboxMessage"/> rows. Aggregate and message are therefore written in
+/// the same transaction, with no messaging code in the use cases.
 /// </summary>
 public sealed class DomainEventsToOutboxInterceptor(TimeProvider clock) : SaveChangesInterceptor
 {
@@ -45,7 +45,7 @@ public sealed class DomainEventsToOutboxInterceptor(TimeProvider clock) : SaveCh
             return;
         }
 
-        // Activity.Current.Id já está no formato W3C "traceparent" (padrão no .NET).
+        // Activity.Current.Id is already in W3C "traceparent" format (the .NET default).
         var traceParent = Activity.Current?.Id;
         var now = clock.GetUtcNow();
 

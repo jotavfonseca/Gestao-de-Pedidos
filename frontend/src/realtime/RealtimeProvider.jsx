@@ -6,9 +6,9 @@ const HUB_URL = '/hubs/orders'
 const RETRY_DELAY_MS = 5000
 
 /**
- * Mantém uma conexão SignalR com /hubs/orders e distribui o evento
- * `orderStatusChanged` para quem se inscrever. O SignalR negocia o
- * transporte (WebSocket → Server-Sent Events → long polling) sozinho.
+ * Keeps a SignalR connection to /hubs/orders and forwards the
+ * `orderStatusChanged` event to subscribers. SignalR negotiates the
+ * transport (WebSocket → Server-Sent Events → long polling) on its own.
  */
 export default function RealtimeProvider({ children }) {
   const [status, setStatus] = useState('connecting')
@@ -20,7 +20,7 @@ export default function RealtimeProvider({ children }) {
 
     const connection = new HubConnectionBuilder()
       .withUrl(HUB_URL)
-      // Nunca desiste: tenta de novo a cada 5 s enquanto a página estiver aberta.
+      // Never gives up: retries every 5 s while the page is open.
       .withAutomaticReconnect({ nextRetryDelayInMilliseconds: () => RETRY_DELAY_MS })
       .configureLogging(LogLevel.Warning)
       .build()
@@ -37,8 +37,8 @@ export default function RealtimeProvider({ children }) {
       }
     })
 
-    // A reconexão automática só cobre quedas depois de conectado;
-    // a primeira conexão é tentada aqui até dar certo.
+    // Automatic reconnect only covers drops after a successful connection;
+    // the first connection is retried here until it succeeds.
     async function start() {
       if (disposed || connection.state !== HubConnectionState.Disconnected) return
       try {

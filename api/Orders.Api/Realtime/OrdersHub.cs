@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.SignalR;
 namespace Orders.Api.Realtime;
 
 /// <summary>
-/// Hub de notificações em /hubs/orders. Os clientes só recebem o evento
-/// <c>orderStatusChanged</c>; não há métodos chamados pelo cliente.
+/// Notification hub at /hubs/orders. Clients only receive the
+/// <c>orderStatusChanged</c> event; there are no client-invoked methods.
 /// </summary>
 public sealed class OrdersHub : Hub
 {

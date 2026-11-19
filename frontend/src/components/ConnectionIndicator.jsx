@@ -1,10 +1,10 @@
 import { useRealtime } from '../realtime/context'
 
 const states = {
-  connected: { label: 'Tempo real', dot: 'bg-emerald-500', hint: 'Atualizações chegam via SignalR.' },
-  connecting: { label: 'Conectando…', dot: 'bg-slate-400', hint: 'Abrindo conexão em tempo real.' },
-  reconnecting: { label: 'Polling', dot: 'bg-amber-500', hint: 'Conexão em tempo real caiu; atualizando a cada 5 s.' },
-  disconnected: { label: 'Polling', dot: 'bg-amber-500', hint: 'Sem conexão em tempo real; atualizando a cada 5 s.' },
+  connected: { label: 'Live', dot: 'bg-emerald-500', hint: 'Updates arrive over SignalR.' },
+  connecting: { label: 'Connecting…', dot: 'bg-slate-400', hint: 'Opening the real-time connection.' },
+  reconnecting: { label: 'Polling', dot: 'bg-amber-500', hint: 'Real-time connection dropped; refreshing every 5 s.' },
+  disconnected: { label: 'Polling', dot: 'bg-amber-500', hint: 'No real-time connection; refreshing every 5 s.' },
 }
 
 export default function ConnectionIndicator() {

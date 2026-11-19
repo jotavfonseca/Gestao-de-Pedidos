@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Cancela execuções antigas do mesmo branch/PR
+# Cancel older runs of the same branch/PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   backend:
-    name: Backend (.NET build + testes)
+    name: Backend (.NET build + tests)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -38,7 +38,7 @@ jobs:
       - name: Build
         run: dotnet build Orders.sln -c Release --no-restore
 
-      # O runner tem Docker: os testes de integração sobem PostgreSQL com Testcontainers.
+      # The runner has Docker: integration tests start PostgreSQL with Testcontainers.
       - name: Test
         run: >
           dotnet test Orders.sln -c Release --no-build
@@ -74,17 +74,17 @@ jobs:
       - run: npm run build
 
   docker:
-    name: Docker (compose + imagens)
+    name: Docker (compose + images)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
-      - name: Usar o .env de exemplo
+      - name: Use the sample .env
         run: cp .env.example .env
 
-      - name: Validar docker-compose.yml
+      - name: Validate docker-compose.yml
         run: docker compose config --quiet
 
-      - name: Build das imagens (api, worker, frontend)
+      - name: Build images (api, worker, frontend)
         run: docker compose build

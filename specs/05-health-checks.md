@@ -1,50 +1,49 @@
 # 05 — Health checks
 
-- **Status:** Concluída
-- **Pontuação:** obrigatória
+- **Status:** Done
+- **Score:** required
 
-## Contexto
+## Context
 
-Hoje `/health` só verifica o Postgres. Não há verificação da fila, não há
-separação entre *liveness* e *readiness*, e o worker (que não é web) não tem
-healthcheck no Compose.
+`/health` only checked PostgreSQL. There was no queue check, no split between
+*liveness* and *readiness*, and the worker (not a web app) had no Compose healthcheck.
 
-## Requisitos
+## Requirements
 
-- Health checks para API, banco e fila — desafio §1 *Regras adicionais*.
-- Healthchecks no Compose — desafio §3.
+- Health checks for the API, the database and the queue — challenge §1 *Additional rules*.
+- Healthchecks in Compose — challenge §3.
 
-## Critérios de aceite
+## Acceptance criteria
 
-1. **Quando** `GET /health/live`, **então** `200` enquanto o processo da API estiver de pé (não depende de banco nem fila).
-2. **Quando** `GET /health/ready` (ou `/health`), **então** o JSON lista `self`, `postgres` e `servicebus` com status e duração; `200` se todos `Healthy`, `503` se algum `Unhealthy`.
-3. **Dado** o Postgres parado, **então** `/health/ready` responde `503` com `postgres: Unhealthy`.
-4. **Dado** o emulador do Service Bus parado, **então** `/health/ready` responde `503` com `servicebus: Unhealthy`.
-5. No Compose, `docker compose ps` mostra `healthy` para postgres, servicebus (ou sqlserver), api, worker, frontend e jaeger quando tudo está no ar.
+1. **When** `GET /health/live`, **then** `200` while the API process is up (does not depend on the database or the queue).
+2. **When** `GET /health/ready` (or `/health`), **then** the JSON lists `self`, `postgres` and `servicebus` with status and duration; `200` if all are `Healthy`, `503` if any is `Unhealthy`.
+3. **Given** PostgreSQL stopped, **then** `/health/ready` returns `503` with `postgres: Unhealthy`.
+4. **Given** the Service Bus emulator stopped, **then** `/health/ready` returns `503` with `servicebus: Unhealthy`.
+5. In Compose, `docker compose ps` shows `healthy` for every service with a healthcheck when everything is up.
 
 ## Design
 
-- `api/Orders.Api/Health/ServiceBusHealthCheck.cs`: cria um receiver da fila `order-created` e faz `PeekMessageAsync` com timeout de 5 s. Escolhido porque o emulador **não** suporta as operações de administração usadas pelo pacote `AspNetCore.HealthChecks.AzureServiceBus`.
-- Postgres: `AddNpgSql` (pacote `AspNetCore.HealthChecks.NpgSql`).
-- Tags `live` / `ready` para separar os endpoints; resposta JSON própria (`status`, `totalDuration`, `checks[]`).
-- Worker: arquivo de heartbeat atualizado a cada 10 s; healthcheck do Compose verifica se foi modificado no último minuto.
-- Frontend (nginx): `wget -q --spider http://localhost/` (busybox do alpine).
+- `api/Orders.Api/Health/ServiceBusHealthCheck.cs`: creates a receiver for the `order-created` queue and calls `PeekMessageAsync` with a 5 s timeout. Chosen because the emulator does **not** support the management operations used by `AspNetCore.HealthChecks.AzureServiceBus`.
+- PostgreSQL: `AddNpgSql` (`AspNetCore.HealthChecks.NpgSql` package).
+- A `live` tag separates the endpoints; custom JSON response (`status`, `totalDuration`, `checks[]`).
+- Worker: heartbeat file updated every 10 s; the Compose healthcheck checks it was modified within the last minute.
+- Frontend (nginx): `wget -q --spider` (alpine busybox).
 
 ## Tasks
 
-- [x] 5.1 Endpoints `/health/live`, `/health/ready` e `/health` com writer JSON.
-- [x] 5.2 `ServiceBusHealthCheck` com peek e timeout.
-- [x] 5.3 Healthchecks de todos os serviços no Compose (feito junto com a spec 11).
+- [x] 5.1 `/health/live`, `/health/ready` and `/health` endpoints with a JSON writer.
+- [x] 5.2 `ServiceBusHealthCheck` with peek and timeout.
+- [x] 5.3 Healthchecks for every service in Compose (done with spec 11).
 
-## Verificação
+## Verification
 
-- `curl -i localhost:5000/health/live` e `curl -s localhost:5000/health/ready | jq`.
-- Critérios 3–4: `docker compose stop postgres` / `stop servicebus` e repetir o curl.
-- Critério 5: `docker compose ps`.
+- `curl -i localhost:5000/health/live` and `curl -s localhost:5000/health/ready | jq`.
+- Criteria 3–4: `docker compose stop postgres` / `stop servicebus` and repeat the curl.
+- Criterion 5: `docker compose ps`.
 
-## Notas de implementação
+## Implementation notes
 
-- O healthcheck do Compose da **API usa `/health/ready`**: o container só fica `healthy` quando PostgreSQL e Service Bus estão prontos, e worker/frontend esperam por isso.
-- O emulador do Service Bus não tem healthcheck próprio (a imagem não traz ferramenta para isso); a prontidão dele é medida pelo check `servicebus` da API. Jaeger e pgAdmin também ficam sem healthcheck.
-- Frontend: `wget` em `127.0.0.1` (em `localhost` o busybox pode tentar IPv6).
-- Verificado: `docker compose ps` com api, worker, frontend, postgres e sqlserver `healthy`; `/health/ready` = 503 com o Service Bus parado.
+- The API's Compose healthcheck **uses `/health/ready`**: the container only becomes `healthy` when PostgreSQL and Service Bus are ready, and the worker/frontend wait for it.
+- The Service Bus emulator has no healthcheck of its own (the image has no tool for it); its readiness is measured by the API's `servicebus` check. Jaeger and pgAdmin have no healthcheck either.
+- Frontend: `wget` on `127.0.0.1` (on `localhost` busybox may try IPv6).
+- Verified: `docker compose ps` with api, worker, frontend, postgres and sqlserver `healthy`; `/health/ready` = 503 with Service Bus stopped.

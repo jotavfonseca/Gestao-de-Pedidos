@@ -16,7 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 var configuration = builder.Configuration;
 
 var postgres = configuration.GetConnectionString("Postgres")
-    ?? throw new InvalidOperationException("ConnectionStrings:Postgres não configurada.");
+    ?? throw new InvalidOperationException("ConnectionStrings:Postgres is not configured.");
 var messaging = configuration.GetMessagingOptions();
 
 builder.Logging.Configure(options => options.ActivityTrackingOptions =
@@ -28,7 +28,7 @@ builder.Logging.AddSimpleConsole(options =>
     options.TimestampFormat = "HH:mm:ss ";
 });
 
-// Domínio, aplicação e persistência
+// Domain, application and persistence
 builder.Services.AddOrdersPersistence(postgres).AddOrdersApplication();
 
 // HTTP
@@ -40,7 +40,7 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Gestão de Pedidos API", Version = "v1" });
+    options.SwaggerDoc("v1", new OpenApiInfo { Title = "Order Management API", Version = "v1" });
     var xml = Path.Combine(AppContext.BaseDirectory, "Orders.Api.xml");
     if (File.Exists(xml))
     {
@@ -48,7 +48,7 @@ builder.Services.AddSwaggerGen(options =>
     }
 });
 
-// Tempo real
+// Real time
 builder.Services
     .AddSignalR()
     .AddJsonProtocol(options => options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -56,10 +56,10 @@ builder.Services.AddSingleton<IOrderNotifier, SignalROrderNotifier>();
 
 // Health checks
 var healthChecks = builder.Services.AddHealthChecks()
-    .AddCheck("self", () => HealthCheckResult.Healthy("API em execução."), tags: [HealthEndpoints.LiveTag])
+    .AddCheck("self", () => HealthCheckResult.Healthy("API is running."), tags: [HealthEndpoints.LiveTag])
     .AddNpgSql(postgres, name: "postgres", timeout: TimeSpan.FromSeconds(5));
 
-// Mensageria (Service Bus + outbox + consumidor de status)
+// Messaging (Service Bus + outbox + status consumer)
 if (messaging.Enabled)
 {
     builder.Services.AddServiceBusMessaging(configuration);
@@ -67,10 +67,10 @@ if (messaging.Enabled)
     healthChecks.AddCheck<ServiceBusHealthCheck>("servicebus");
 }
 
-// Módulo IA (opcional: ativo só com ANTHROPIC_API_KEY)
+// AI module (optional: enabled only with ANTHROPIC_API_KEY)
 builder.Services.AddOrderAnalytics(configuration);
 
-// Observabilidade
+// Observability
 builder.Services.AddOrdersTelemetry(configuration, "orders-api", tracing => tracing
     .AddAspNetCoreInstrumentation(options =>
         options.Filter = context => !context.Request.Path.StartsWithSegments("/health"))

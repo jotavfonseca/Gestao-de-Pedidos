@@ -3,17 +3,17 @@ using Orders.Core.Infrastructure.Persistence;
 
 namespace Orders.Core.Application.Orders;
 
-public sealed record CreateOrderCommand(string Cliente, string Produto, decimal Valor);
+public sealed record CreateOrderCommand(string Customer, string Product, decimal Amount);
 
 /// <summary>
-/// Cria o pedido. A mensagem OrderCreated é gerada pelo agregado e gravada
-/// no outbox pelo interceptor, na mesma transação.
+/// Creates an order. The OrderCreated message is raised by the aggregate and written
+/// to the outbox by the interceptor, in the same transaction.
 /// </summary>
 public sealed class CreateOrderHandler(OrderContext db, TimeProvider clock)
 {
     public async Task<OrderDto> HandleAsync(CreateOrderCommand command, CancellationToken cancellationToken)
     {
-        var order = Order.Create(command.Cliente, command.Produto, Money.Of(command.Valor), clock.GetUtcNow());
+        var order = Order.Create(command.Customer, command.Product, Money.Of(command.Amount), clock.GetUtcNow());
 
         db.Orders.Add(order);
         await db.SaveChangesAsync(cancellationToken);

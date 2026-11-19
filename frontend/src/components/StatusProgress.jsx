@@ -1,14 +1,14 @@
 import { STATUS_SEQUENCE } from './status'
 
-/** Barra Pendente → Processando → Finalizado com a etapa atual destacada. */
+/** Pending → Processing → Completed bar with the current step highlighted. */
 export default function StatusProgress({ status }) {
   const current = STATUS_SEQUENCE.indexOf(status)
 
   return (
-    <ol className="grid grid-cols-3 gap-2" aria-label="Progresso do pedido">
+    <ol className="grid grid-cols-3 gap-2" aria-label="Order progress">
       {STATUS_SEQUENCE.map((step, index) => {
-        const done = index < current || status === 'Finalizado'
-        const active = index === current && status !== 'Finalizado'
+        const done = index < current || status === 'Completed'
+        const active = index === current && status !== 'Completed'
         return (
           <li key={step} className="flex flex-col gap-2" aria-current={index === current ? 'step' : undefined}>
             <span

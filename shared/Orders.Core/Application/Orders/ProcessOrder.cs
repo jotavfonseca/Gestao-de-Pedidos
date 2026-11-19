@@ -10,30 +10,30 @@ public sealed class ProcessingOptions
 {
     public const string SectionName = "Processing";
 
-    /// <summary>Tempo entre Processando e Finalizado (desafio: 5 s).</summary>
+    /// <summary>Time between Processing and Completed (challenge: 5 s).</summary>
     public int DelaySeconds { get; set; } = 5;
 }
 
 public enum ProcessOrderOutcome
 {
-    /// <summary>Esta execução levou o pedido até Finalizado.</summary>
-    Finalized,
+    /// <summary>This run took the order all the way to Completed.</summary>
+    Completed,
 
-    /// <summary>O pedido já estava finalizado: mensagem duplicada, nada a fazer.</summary>
-    AlreadyFinalized,
+    /// <summary>The order was already completed: duplicate message, nothing to do.</summary>
+    AlreadyCompleted,
 
-    /// <summary>O pedido não existe.</summary>
+    /// <summary>The order does not exist.</summary>
     OrderNotFound
 }
 
 /// <summary>
-/// Processa um pedido de forma idempotente. O estado atual do agregado decide
-/// o que fazer, e a concorrência otimista (xmin) impede que duas entregas da
-/// mesma mensagem façam a mesma transição:
+/// Processes an order idempotently. The aggregate's current state decides what to do,
+/// and optimistic concurrency (xmin) prevents two deliveries of the same message from
+/// performing the same transition:
 /// <list type="bullet">
-/// <item>Pendente → Processando → (espera) → Finalizado</item>
-/// <item>Processando (reentrega após falha) → Finalizado</item>
-/// <item>Finalizado → nada</item>
+/// <item>Pending → Processing → (wait) → Completed</item>
+/// <item>Processing (redelivery after a failure) → Completed</item>
+/// <item>Completed → nothing</item>
 /// </list>
 /// </summary>
 public sealed class ProcessOrderHandler(
@@ -54,9 +54,9 @@ public sealed class ProcessOrderHandler(
             }
             catch (DbUpdateConcurrencyException) when (attempt < MaxConcurrencyRetries)
             {
-                // Outra entrega da mesma mensagem mudou o pedido antes: recarrega e reavalia.
+                // Another delivery of the same message changed the order first: reload and re-evaluate.
                 logger.LogInformation(
-                    "Conflito de concorrência no pedido {OrderId} (tentativa {Attempt}); reavaliando o estado.",
+                    "Concurrency conflict on order {OrderId} (attempt {Attempt}); re-evaluating its state.",
                     orderId, attempt);
                 db.ChangeTracker.Clear();
             }
@@ -66,7 +66,7 @@ public sealed class ProcessOrderHandler(
     private async Task<ProcessOrderOutcome> ProcessAsync(Guid orderId, CancellationToken cancellationToken)
     {
         var order = await db.Orders
-            .Include(o => o.Historico)
+            .Include(o => o.StatusHistory)
             .SingleOrDefaultAsync(o => o.Id == orderId, cancellationToken);
 
         if (order is null)
@@ -74,21 +74,21 @@ public sealed class ProcessOrderHandler(
             return ProcessOrderOutcome.OrderNotFound;
         }
 
-        if (order.Status == OrderStatus.Finalizado)
+        if (order.Status == OrderStatus.Completed)
         {
-            logger.LogInformation("Pedido {OrderId} já finalizado; mensagem ignorada (idempotência).", orderId);
-            return ProcessOrderOutcome.AlreadyFinalized;
+            logger.LogInformation("Order {OrderId} is already completed; message ignored (idempotency).", orderId);
+            return ProcessOrderOutcome.AlreadyCompleted;
         }
 
-        if (order.Status == OrderStatus.Pendente)
+        if (order.Status == OrderStatus.Pending)
         {
-            order.TransitionTo(OrderStatus.Processando, clock.GetUtcNow());
+            order.TransitionTo(OrderStatus.Processing, clock.GetUtcNow());
             await db.SaveChangesAsync(cancellationToken);
-            logger.LogInformation("Pedido {OrderId} em processamento.", orderId);
+            logger.LogInformation("Order {OrderId} is processing.", orderId);
         }
         else
         {
-            logger.LogInformation("Pedido {OrderId} já estava em processamento; retomando.", orderId);
+            logger.LogInformation("Order {OrderId} was already processing; resuming.", orderId);
         }
 
         var delay = TimeSpan.FromSeconds(Math.Max(0, options.Value.DelaySeconds));
@@ -97,10 +97,10 @@ public sealed class ProcessOrderHandler(
             await Task.Delay(delay, clock, cancellationToken);
         }
 
-        order.TransitionTo(OrderStatus.Finalizado, clock.GetUtcNow());
+        order.TransitionTo(OrderStatus.Completed, clock.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken);
-        logger.LogInformation("Pedido {OrderId} finalizado.", orderId);
+        logger.LogInformation("Order {OrderId} completed.", orderId);
 
-        return ProcessOrderOutcome.Finalized;
+        return ProcessOrderOutcome.Completed;
     }
 }

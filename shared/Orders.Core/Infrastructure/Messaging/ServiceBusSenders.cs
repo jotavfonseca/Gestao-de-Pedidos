@@ -3,7 +3,7 @@ using Azure.Messaging.ServiceBus;
 
 namespace Orders.Core.Infrastructure.Messaging;
 
-/// <summary>Um <see cref="ServiceBusSender"/> por fila, reaproveitado (thread-safe).</summary>
+/// <summary>One reusable (thread-safe) <see cref="ServiceBusSender"/> per queue.</summary>
 public sealed class ServiceBusSenders(ServiceBusClient client) : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, ServiceBusSender> _senders = new();

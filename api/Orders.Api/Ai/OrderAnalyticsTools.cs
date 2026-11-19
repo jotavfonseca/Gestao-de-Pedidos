@@ -7,17 +7,17 @@ using Orders.Core.Infrastructure.Persistence;
 
 namespace Orders.Api.Ai;
 
-/// <summary>Parâmetro inválido enviado pela LLM; devolvido a ela como tool_result de erro.</summary>
+/// <summary>Invalid parameter sent by the LLM; returned to it as an error tool_result.</summary>
 public sealed class ToolInputException(string message) : Exception(message);
 
 /// <summary>
-/// Ferramentas que a LLM pode chamar. Todas são somente leitura, com
-/// parâmetros validados e consultas fixas — a LLM nunca escreve SQL.
+/// Tools the LLM can call. All of them are read-only, with validated parameters
+/// and fixed queries — the LLM never writes SQL.
 /// </summary>
 public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo timeZone)
 {
     public const string CountOrders = "count_orders";
-    public const string SumOrderValues = "sum_order_values";
+    public const string SumOrderAmounts = "sum_order_amounts";
     public const string AverageProcessingTime = "avg_processing_time";
     public const string OrdersByStatus = "orders_by_status";
     public const string ListRecentOrders = "list_recent_orders";
@@ -31,11 +31,11 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
         object result = name switch
         {
             CountOrders => await CountAsync(input, cancellationToken),
-            SumOrderValues => await SumAsync(input, cancellationToken),
+            SumOrderAmounts => await SumAsync(input, cancellationToken),
             AverageProcessingTime => await AverageProcessingTimeAsync(input, cancellationToken),
             OrdersByStatus => await ByStatusAsync(input, cancellationToken),
             ListRecentOrders => await ListRecentAsync(input, cancellationToken),
-            _ => throw new ToolInputException($"Ferramenta desconhecida: {name}.")
+            _ => throw new ToolInputException($"Unknown tool: {name}.")
         };
 
         return JsonSerializer.Serialize(result, JsonOptions);
@@ -45,7 +45,7 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
     {
         var filter = ReadFilter(input, allowStatus: true);
         var count = await Apply(filter).CountAsync(ct);
-        return new { filter = filter.Describe(), quantidade = count };
+        return new { filter = filter.Describe(), count };
     }
 
     private async Task<object> SumAsync(IReadOnlyDictionary<string, JsonElement> input, CancellationToken ct)
@@ -53,38 +53,38 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
         var filter = ReadFilter(input, allowStatus: true);
         var query = Apply(filter);
         var count = await query.CountAsync(ct);
-        var total = count == 0 ? 0m : await query.SumAsync(o => o.Valor.Amount, ct);
+        var total = count == 0 ? 0m : await query.SumAsync(o => o.Amount.Value, ct);
         return new
         {
             filter = filter.Describe(),
-            quantidade = count,
-            valorTotal = total,
-            ticketMedio = count == 0 ? 0m : Math.Round(total / count, 2)
+            count,
+            totalAmount = total,
+            averageAmount = count == 0 ? 0m : Math.Round(total / count, 2)
         };
     }
 
     private async Task<object> AverageProcessingTimeAsync(IReadOnlyDictionary<string, JsonElement> input, CancellationToken ct)
     {
-        var filter = ReadFilter(input, allowStatus: false) with { Status = OrderStatus.Finalizado };
+        var filter = ReadFilter(input, allowStatus: false) with { Status = OrderStatus.Completed };
 
-        // Do registro Pendente (criação) até o registro Finalizado no histórico.
+        // From the Pending entry (creation) to the Completed entry in the status history.
         var spans = await Apply(filter)
             .Select(o => new
             {
-                Inicio = o.Historico.Where(h => h.Status == OrderStatus.Pendente).Min(h => h.Data),
-                Fim = o.Historico.Where(h => h.Status == OrderStatus.Finalizado).Max(h => h.Data)
+                Start = o.StatusHistory.Where(h => h.Status == OrderStatus.Pending).Min(h => h.ChangedAt),
+                End = o.StatusHistory.Where(h => h.Status == OrderStatus.Completed).Max(h => h.ChangedAt)
             })
             .ToListAsync(ct);
 
-        var seconds = spans.Select(s => (s.Fim - s.Inicio).TotalSeconds).ToList();
+        var seconds = spans.Select(s => (s.End - s.Start).TotalSeconds).ToList();
         return new
         {
             filter = filter.Describe(),
-            medida = "Tempo entre a criação do pedido (Pendente) e a finalização (Finalizado).",
-            pedidosConsiderados = seconds.Count,
-            mediaSegundos = seconds.Count == 0 ? (double?)null : Math.Round(seconds.Average(), 2),
-            minimoSegundos = seconds.Count == 0 ? (double?)null : Math.Round(seconds.Min(), 2),
-            maximoSegundos = seconds.Count == 0 ? (double?)null : Math.Round(seconds.Max(), 2)
+            measures = "Time from order creation (Pending) to completion (Completed).",
+            ordersConsidered = seconds.Count,
+            averageSeconds = seconds.Count == 0 ? (double?)null : Math.Round(seconds.Average(), 2),
+            minSeconds = seconds.Count == 0 ? (double?)null : Math.Round(seconds.Min(), 2),
+            maxSeconds = seconds.Count == 0 ? (double?)null : Math.Round(seconds.Max(), 2)
         };
     }
 
@@ -93,16 +93,16 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
         var filter = ReadFilter(input, allowStatus: false);
         var rows = await Apply(filter)
             .GroupBy(o => o.Status)
-            .Select(g => new { Status = g.Key, Quantidade = g.Count(), ValorTotal = g.Sum(o => o.Valor.Amount) })
+            .Select(g => new { Status = g.Key, Count = g.Count(), TotalAmount = g.Sum(o => o.Amount.Value) })
             .ToListAsync(ct);
 
         return new
         {
             filter = filter.Describe(),
-            porStatus = Enum.GetValues<OrderStatus>().Select(status =>
+            byStatus = Enum.GetValues<OrderStatus>().Select(status =>
             {
                 var row = rows.SingleOrDefault(r => r.Status == status);
-                return new { status = status.ToString(), quantidade = row?.Quantidade ?? 0, valorTotal = row?.ValorTotal ?? 0m };
+                return new { status = status.ToString(), count = row?.Count ?? 0, totalAmount = row?.TotalAmount ?? 0m };
             })
         };
     }
@@ -115,27 +115,27 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
         {
             if (rawLimit.ValueKind != JsonValueKind.Number || !rawLimit.TryGetInt32(out limit) || limit is < 1 or > MaxListLimit)
             {
-                throw new ToolInputException($"'limit' deve ser um inteiro entre 1 e {MaxListLimit}.");
+                throw new ToolInputException($"'limit' must be an integer between 1 and {MaxListLimit}.");
             }
         }
 
         var orders = await Apply(filter)
-            .OrderByDescending(o => o.DataCriacao)
+            .OrderByDescending(o => o.CreatedAt)
             .Take(limit)
-            .Select(o => new { o.Id, o.Cliente, o.Produto, Valor = o.Valor.Amount, o.Status, o.DataCriacao })
+            .Select(o => new { o.Id, o.Customer, o.Product, Amount = o.Amount.Value, o.Status, o.CreatedAt })
             .ToListAsync(ct);
 
         return new
         {
             filter = filter.Describe(),
-            pedidos = orders.Select(o => new
+            orders = orders.Select(o => new
             {
                 id = o.Id,
-                cliente = o.Cliente,
-                produto = o.Produto,
-                valor = o.Valor,
+                customer = o.Customer,
+                product = o.Product,
+                amount = o.Amount,
                 status = o.Status.ToString(),
-                dataCriacao = TimeZoneInfo.ConvertTime(o.DataCriacao, timeZone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                createdAt = TimeZoneInfo.ConvertTime(o.CreatedAt, timeZone).ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
             })
         };
     }
@@ -150,12 +150,12 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
 
         if (filter.From is { } from)
         {
-            query = query.Where(o => o.DataCriacao >= from);
+            query = query.Where(o => o.CreatedAt >= from);
         }
 
         if (filter.To is { } to)
         {
-            query = query.Where(o => o.DataCriacao < to);
+            query = query.Where(o => o.CreatedAt < to);
         }
 
         return query;
@@ -168,7 +168,7 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
         {
             if (rawStatus.ValueKind != JsonValueKind.String || !Enum.TryParse<OrderStatus>(rawStatus.GetString(), ignoreCase: true, out var parsed))
             {
-                throw new ToolInputException("'status' deve ser Pendente, Processando ou Finalizado.");
+                throw new ToolInputException("'status' must be Pending, Processing or Completed.");
             }
 
             status = parsed;
@@ -178,13 +178,13 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
         var to = ReadDate(input, "to");
         if (from is not null && to is not null && from >= to)
         {
-            throw new ToolInputException("'from' deve ser anterior a 'to'.");
+            throw new ToolInputException("'from' must be earlier than 'to'.");
         }
 
         return new OrderFilter(status, from, to);
     }
 
-    /// <summary>Aceita data (yyyy-MM-dd) ou data/hora ISO-8601; sem fuso, usa o fuso configurado.</summary>
+    /// <summary>Accepts a date (yyyy-MM-dd) or an ISO-8601 date-time; without an offset, the configured time zone is used.</summary>
     private DateTimeOffset? ReadDate(IReadOnlyDictionary<string, JsonElement> input, string key)
     {
         if (!input.TryGetValue(key, out var raw) || raw.ValueKind == JsonValueKind.Null)
@@ -195,7 +195,7 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
         var text = raw.ValueKind == JsonValueKind.String ? raw.GetString() : null;
         if (string.IsNullOrWhiteSpace(text))
         {
-            throw new ToolInputException($"'{key}' deve ser uma data ISO-8601.");
+            throw new ToolInputException($"'{key}' must be an ISO-8601 date.");
         }
 
         if (ExplicitOffset().IsMatch(text)
@@ -210,7 +210,7 @@ public sealed partial class OrderAnalyticsTools(OrderContext db, TimeZoneInfo ti
             return new DateTimeOffset(unspecified, timeZone.GetUtcOffset(unspecified)).ToUniversalTime();
         }
 
-        throw new ToolInputException($"'{key}' deve ser uma data ISO-8601 (ex.: 2026-11-01 ou 2026-11-01T08:00:00).");
+        throw new ToolInputException($"'{key}' must be an ISO-8601 date (e.g. 2026-11-01 or 2026-11-01T08:00:00).");
     }
 
     [GeneratedRegex(@"(Z|[+-]\d{2}:?\d{2})$", RegexOptions.IgnoreCase)]

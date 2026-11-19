@@ -5,9 +5,9 @@ namespace Orders.Api.Contracts;
 
 public sealed class AskRequest
 {
-    /// <example>Quantos pedidos estão pendentes?</example>
-    [Required(AllowEmptyStrings = false, ErrorMessage = "Escreva uma pergunta.")]
-    [StringLength(500, ErrorMessage = "A pergunta deve ter no máximo {1} caracteres.")]
+    /// <example>How many orders are pending?</example>
+    [Required(AllowEmptyStrings = false, ErrorMessage = "Please type a question.")]
+    [StringLength(500, ErrorMessage = "The question must be at most {1} characters.")]
     public string? Question { get; init; }
 }
 

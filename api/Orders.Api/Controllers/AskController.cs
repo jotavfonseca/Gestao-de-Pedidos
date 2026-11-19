@@ -5,17 +5,17 @@ using Orders.Api.Contracts;
 
 namespace Orders.Api.Controllers;
 
-/// <summary>Módulo "Pergunte sobre os pedidos" (IA).</summary>
+/// <summary>"Ask about your orders" module (AI).</summary>
 [ApiController]
 [Route("orders/ask")]
 public sealed class AskController(IOrderAnalyticsService analytics, IOptions<AiOptions> options) : ControllerBase
 {
-    /// <summary>Indica se o módulo de IA está ativo.</summary>
+    /// <summary>Tells whether the AI module is enabled.</summary>
     [HttpGet("status")]
     public AskStatusResponse Status() =>
         new(analytics.Enabled, analytics.Enabled ? options.Value.Model : null);
 
-    /// <summary>Responde uma pergunta em linguagem natural usando dados reais dos pedidos.</summary>
+    /// <summary>Answers a natural-language question using real order data.</summary>
     [HttpPost]
     [ProducesResponseType<AskResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -32,12 +32,12 @@ public sealed class AskController(IOrderAnalyticsService analytics, IOptions<AiO
         }
         catch (AiDisabledException ex)
         {
-            return Problem(title: "Módulo de IA desativado.", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
+            return Problem(title: "AI module disabled.", detail: ex.Message, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         catch (AiUnavailableException ex)
         {
             return Problem(
-                title: "Serviço de IA indisponível.",
+                title: "AI service unavailable.",
                 detail: ex.Message,
                 statusCode: ex.Transient ? StatusCodes.Status503ServiceUnavailable : StatusCodes.Status502BadGateway);
         }

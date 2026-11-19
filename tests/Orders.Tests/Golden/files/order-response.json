@@ -1,22 +1,22 @@
 {
   "id": "4f0c6c8e-2d3b-4a8e-9a51-1f2e3d4c5b6a",
-  "cliente": "Ana Souza",
-  "produto": "Teclado mecânico",
-  "valor": 349.90,
-  "status": "Finalizado",
-  "dataCriacao": "2026-11-19T13:00:00+00:00",
-  "historico": [
+  "customer": "Jane Doe",
+  "product": "Mechanical keyboard",
+  "amount": 349.90,
+  "status": "Completed",
+  "createdAt": "2026-11-19T13:00:00+00:00",
+  "statusHistory": [
     {
-      "status": "Pendente",
-      "data": "2026-11-19T13:00:00+00:00"
+      "status": "Pending",
+      "changedAt": "2026-11-19T13:00:00+00:00"
     },
     {
-      "status": "Processando",
-      "data": "2026-11-19T13:00:01+00:00"
+      "status": "Processing",
+      "changedAt": "2026-11-19T13:00:01+00:00"
     },
     {
-      "status": "Finalizado",
-      "data": "2026-11-19T13:00:06+00:00"
+      "status": "Completed",
+      "changedAt": "2026-11-19T13:00:06+00:00"
     }
   ]
 }

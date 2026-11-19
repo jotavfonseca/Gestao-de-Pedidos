@@ -1,47 +1,47 @@
 @host = http://localhost:5000
 
-### Criar pedido (201 + Location)
-# @name criar
+### Create an order (201 + Location)
+# @name create
 POST {{host}}/orders
 Content-Type: application/json
 
 {
-  "cliente": "Ana Souza",
-  "produto": "Teclado mecânico",
-  "valor": 349.90
+  "customer": "Jane Doe",
+  "product": "Mechanical keyboard",
+  "amount": 349.90
 }
 
-### Detalhar o pedido criado (status muda para Processando e, 5 s depois, Finalizado)
-GET {{host}}/orders/{{criar.response.body.$.id}}
+### Order details (moves to Processing and, 5 s later, Completed)
+GET {{host}}/orders/{{create.response.body.$.id}}
 
-### Listar pedidos
+### List orders
 GET {{host}}/orders
 
-### Dados inválidos (400 com erros por campo)
+### Invalid data (400 with per-field errors)
 POST {{host}}/orders
 Content-Type: application/json
 
 {
-  "cliente": "",
-  "produto": "Mouse",
-  "valor": 0
+  "customer": "",
+  "product": "Mouse",
+  "amount": 0
 }
 
-### Pedido inexistente (404)
+### Unknown order (404)
 GET {{host}}/orders/00000000-0000-0000-0000-000000000000
 
-### Módulo IA: está ativo?
+### AI module: enabled?
 GET {{host}}/orders/ask/status
 
-### Módulo IA: pergunta (503 se ANTHROPIC_API_KEY não estiver configurada)
+### AI module: question (503 if ANTHROPIC_API_KEY is not set)
 POST {{host}}/orders/ask
 Content-Type: application/json
 
 {
-  "question": "Quantos pedidos estão pendentes?"
+  "question": "How many orders are pending?"
 }
 
-### Health: processo
+### Health: process
 GET {{host}}/health/live
 
 ### Health: API + PostgreSQL + Service Bus

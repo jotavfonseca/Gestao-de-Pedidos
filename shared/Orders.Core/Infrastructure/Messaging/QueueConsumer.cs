@@ -7,7 +7,7 @@ using Orders.Core.Contracts;
 
 namespace Orders.Core.Infrastructure.Messaging;
 
-/// <summary>Resultado do processamento de uma mensagem.</summary>
+/// <summary>Outcome of handling a message.</summary>
 public sealed record ConsumeResult(bool DeadLetter, string? Reason = null, string? Description = null)
 {
     public static readonly ConsumeResult Complete = new(false);
@@ -16,9 +16,9 @@ public sealed record ConsumeResult(bool DeadLetter, string? Reason = null, strin
 }
 
 /// <summary>
-/// Base para consumidores de fila: um escopo de DI por mensagem, span de
-/// tracing ligado ao produtor e liquidação explícita (complete / dead-letter /
-/// abandon em caso de exceção, para reentrega até o MaxDeliveryCount).
+/// Base class for queue consumers: one DI scope per message, a tracing span linked
+/// to the producer, and explicit settlement (complete / dead-letter / abandon on
+/// exceptions, so the message is redelivered up to MaxDeliveryCount).
 /// </summary>
 public abstract class QueueConsumer(
     ServiceBusClient client,
@@ -47,7 +47,7 @@ public abstract class QueueConsumer(
         processor.ProcessErrorAsync += OnErrorAsync;
 
         await processor.StartProcessingAsync(stoppingToken);
-        logger.LogInformation("Consumindo a fila {Queue}.", QueueName);
+        logger.LogInformation("Consuming queue {Queue}.", QueueName);
 
         try
         {
@@ -55,7 +55,7 @@ public abstract class QueueConsumer(
         }
         catch (OperationCanceledException)
         {
-            // Encerramento normal.
+            // Normal shutdown.
         }
         finally
         {
@@ -83,7 +83,7 @@ public abstract class QueueConsumer(
 
             if (result.DeadLetter)
             {
-                logger.LogWarning("Mensagem {MessageId} enviada para a dead-letter: {Reason} — {Description}",
+                logger.LogWarning("Message {MessageId} dead-lettered: {Reason} — {Description}",
                     message.MessageId, result.Reason, result.Description);
                 await args.DeadLetterMessageAsync(message, result.Reason, result.Description, args.CancellationToken);
                 activity?.SetStatus(ActivityStatusCode.Error, result.Reason);
@@ -94,7 +94,7 @@ public abstract class QueueConsumer(
         }
         catch (Exception ex) when (!args.CancellationToken.IsCancellationRequested)
         {
-            logger.LogError(ex, "Erro ao processar a mensagem {MessageId} (entrega {DeliveryCount}); será reentregue.",
+            logger.LogError(ex, "Error handling message {MessageId} (delivery {DeliveryCount}); it will be redelivered.",
                 message.MessageId, message.DeliveryCount);
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             await args.AbandonMessageAsync(message, cancellationToken: CancellationToken.None);
@@ -103,7 +103,7 @@ public abstract class QueueConsumer(
 
     private Task OnErrorAsync(ProcessErrorEventArgs args)
     {
-        logger.LogWarning(args.Exception, "Erro no processador da fila {Queue} ({Source}).", QueueName, args.ErrorSource);
+        logger.LogWarning(args.Exception, "Processor error on queue {Queue} ({Source}).", QueueName, args.ErrorSource);
         return Task.CompletedTask;
     }
 }

@@ -16,10 +16,10 @@ public static class MessagingConstants
 
     public static class Properties
     {
-        /// <summary>Application property exigida pelo desafio.</summary>
+        /// <summary>Application property required by the challenge.</summary>
         public const string EventType = "EventType";
 
-        /// <summary>Contexto W3C para tracing ponta a ponta.</summary>
+        /// <summary>W3C trace context for end-to-end tracing.</summary>
         public const string TraceParent = "traceparent";
     }
 }

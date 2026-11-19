@@ -12,22 +12,22 @@ public sealed class OrdersController(
     OrderQueries queries,
     IOrderNotifier notifier) : ControllerBase
 {
-    /// <summary>Cria um pedido (status inicial Pendente) e agenda a publicação de OrderCreated.</summary>
+    /// <summary>Creates an order (initial status Pending) and schedules the OrderCreated message.</summary>
     [HttpPost]
     [ProducesResponseType<OrderResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<OrderResponse>> Create(CreateOrderRequest request, CancellationToken cancellationToken)
     {
         var order = await createOrder.HandleAsync(
-            new CreateOrderCommand(request.Cliente!, request.Produto!, request.Valor!.Value),
+            new CreateOrderCommand(request.Customer!, request.Product!, request.Amount!.Value),
             cancellationToken);
 
-        await notifier.OrderStatusChangedAsync(order.Id, order.Status, order.DataCriacao, cancellationToken);
+        await notifier.OrderStatusChangedAsync(order.Id, order.Status, order.CreatedAt, cancellationToken);
 
         return CreatedAtAction(nameof(GetById), new { id = order.Id }, OrderResponse.From(order));
     }
 
-    /// <summary>Lista os pedidos, do mais recente para o mais antigo.</summary>
+    /// <summary>Lists orders, newest first.</summary>
     [HttpGet]
     [ProducesResponseType<IReadOnlyList<OrderResponse>>(StatusCodes.Status200OK)]
     public async Task<IReadOnlyList<OrderResponse>> List(CancellationToken cancellationToken)
@@ -36,7 +36,7 @@ public sealed class OrdersController(
         return orders.Select(OrderResponse.From).ToList();
     }
 
-    /// <summary>Detalhes do pedido, com o histórico de status.</summary>
+    /// <summary>Order details, including the status history.</summary>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<OrderResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]

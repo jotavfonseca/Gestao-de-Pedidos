@@ -5,7 +5,7 @@ using Orders.Core.Infrastructure.Messaging;
 
 namespace Orders.Worker;
 
-/// <summary>Consome a fila order-created e delega cada mensagem ao <see cref="OrderCreatedHandler"/>.</summary>
+/// <summary>Consumes the order-created queue and delegates each message to <see cref="OrderCreatedHandler"/>.</summary>
 internal sealed class OrderCreatedConsumer(
     ServiceBusClient client,
     IServiceScopeFactory scopeFactory,

@@ -9,7 +9,7 @@ public sealed class OrderQueries(OrderContext db)
     {
         var order = await db.Orders
             .AsNoTracking()
-            .Include(o => o.Historico)
+            .Include(o => o.StatusHistory)
             .SingleOrDefaultAsync(o => o.Id == id, cancellationToken);
 
         return order is null ? null : OrderDto.From(order);
@@ -19,8 +19,8 @@ public sealed class OrderQueries(OrderContext db)
     {
         var orders = await db.Orders
             .AsNoTracking()
-            .Include(o => o.Historico)
-            .OrderByDescending(o => o.DataCriacao)
+            .Include(o => o.StatusHistory)
+            .OrderByDescending(o => o.CreatedAt)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
 

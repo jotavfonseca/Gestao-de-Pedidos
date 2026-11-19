@@ -4,7 +4,7 @@ using Orders.Core.Domain.Orders.Events;
 
 namespace Orders.Core.Infrastructure.Outbox;
 
-/// <summary>Traduz eventos de domínio (internos) em mensagens de integração (contratos).</summary>
+/// <summary>Translates (internal) domain events into integration messages (contracts).</summary>
 internal static class DomainEventMapper
 {
     public static OutboxMessage ToOutboxMessage(IDomainEvent domainEvent, string? traceParent, DateTimeOffset now) =>
@@ -14,7 +14,7 @@ internal static class DomainEventMapper
                 MessagingConstants.EventTypes.OrderCreated,
                 MessagingConstants.Queues.OrderCreated,
                 e.OrderId.ToString(),
-                MessageSerializer.Serialize(new OrderCreatedMessage(e.OrderId, e.Cliente, e.Produto, e.Valor, e.OccurredAt)),
+                MessageSerializer.Serialize(new OrderCreatedMessage(e.OrderId, e.Customer, e.Product, e.Amount, e.OccurredAt)),
                 traceParent,
                 now),
 
@@ -22,11 +22,11 @@ internal static class DomainEventMapper
                 MessagingConstants.EventTypes.OrderStatusChanged,
                 MessagingConstants.Queues.OrderStatusChanged,
                 e.OrderId.ToString(),
-                MessageSerializer.Serialize(new OrderStatusChangedMessage(e.OrderId, e.De.ToString(), e.Para.ToString(), e.OccurredAt)),
+                MessageSerializer.Serialize(new OrderStatusChangedMessage(e.OrderId, e.From.ToString(), e.To.ToString(), e.OccurredAt)),
                 traceParent,
                 now),
 
             _ => throw new InvalidOperationException(
-                $"Evento de domínio sem mapeamento para mensagem: {domainEvent.GetType().Name}.")
+                $"No message mapping for domain event {domainEvent.GetType().Name}.")
         };
 }

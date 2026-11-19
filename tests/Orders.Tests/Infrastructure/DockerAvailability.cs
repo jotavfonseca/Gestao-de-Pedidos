@@ -19,14 +19,14 @@ internal static class DockerAvailability
     public static bool IsAvailable => Available.Value;
 }
 
-/// <summary>Teste que precisa de Docker; é pulado com aviso quando o Docker não está disponível.</summary>
+/// <summary>A test that needs Docker; skipped with a notice when Docker is not available.</summary>
 public sealed class DockerFactAttribute : FactAttribute
 {
     public DockerFactAttribute()
     {
         if (!DockerAvailability.IsAvailable)
         {
-            Skip = "Docker indisponível: teste de integração (Testcontainers) pulado.";
+            Skip = "Docker is unavailable: integration test (Testcontainers) skipped.";
         }
     }
 }

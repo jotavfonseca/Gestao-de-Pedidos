@@ -5,8 +5,8 @@ using Orders.Core.Contracts;
 namespace Orders.Api.Health;
 
 /// <summary>
-/// Verifica a fila com um peek (operação de dados). Os checks prontos usam
-/// operações de administração, que o emulador do Service Bus não suporta.
+/// Checks the queue with a peek (a data operation). Off-the-shelf checks use
+/// management operations, which the Service Bus emulator does not support.
 /// </summary>
 internal sealed class ServiceBusHealthCheck(ServiceBusClient client) : IHealthCheck
 {
@@ -22,11 +22,11 @@ internal sealed class ServiceBusHealthCheck(ServiceBusClient client) : IHealthCh
             await using var receiver = client.CreateReceiver(MessagingConstants.Queues.OrderCreated);
             await receiver.PeekMessageAsync(cancellationToken: timeout.Token);
 
-            return HealthCheckResult.Healthy($"Fila '{MessagingConstants.Queues.OrderCreated}' acessível.");
+            return HealthCheckResult.Healthy($"Queue '{MessagingConstants.Queues.OrderCreated}' is reachable.");
         }
         catch (Exception ex)
         {
-            return new HealthCheckResult(context.Registration.FailureStatus, "Service Bus indisponível.", ex);
+            return new HealthCheckResult(context.Registration.FailureStatus, "Service Bus is unavailable.", ex);
         }
     }
 }

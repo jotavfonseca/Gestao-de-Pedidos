@@ -4,6 +4,6 @@ namespace Orders.Core.Domain.Orders.Events;
 
 public sealed record OrderStatusChanged(
     Guid OrderId,
-    OrderStatus De,
-    OrderStatus Para,
+    OrderStatus From,
+    OrderStatus To,
     DateTimeOffset OccurredAt) : IDomainEvent;

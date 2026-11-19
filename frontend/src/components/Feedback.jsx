@@ -8,7 +8,7 @@ export function ErrorState({ message, onRetry }) {
           onClick={onRetry}
           className="mt-4 rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100"
         >
-          Tentar novamente
+          Try again
         </button>
       )}
     </div>

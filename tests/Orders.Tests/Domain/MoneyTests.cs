@@ -11,7 +11,7 @@ public class MoneyTests
     public void Rejects_non_positive_values(decimal value)
     {
         var ex = Assert.Throws<DomainValidationException>(() => Money.Of(value));
-        Assert.Equal("valor", ex.Field);
+        Assert.Equal("amount", ex.Field);
     }
 
     [Theory]
@@ -20,7 +20,7 @@ public class MoneyTests
     [InlineData(199.9, 199.90)]
     public void Rounds_to_two_decimals_away_from_zero(decimal input, decimal expected)
     {
-        Assert.Equal(expected, Money.Of(input).Amount);
+        Assert.Equal(expected, Money.Of(input).Value);
     }
 
     [Fact]

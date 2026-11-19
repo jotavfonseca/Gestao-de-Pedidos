@@ -28,15 +28,15 @@ namespace Orders.Core.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Cliente")
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Customer")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<DateTimeOffset>("DataCriacao")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Produto")
+                    b.Property<string>("Product")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
@@ -52,18 +52,18 @@ namespace Orders.Core.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
-                    b.ComplexProperty<Dictionary<string, object>>("Valor", "Orders.Core.Domain.Orders.Order.Valor#Money", b1 =>
+                    b.ComplexProperty<Dictionary<string, object>>("Amount", "Orders.Core.Domain.Orders.Order.Amount#Money", b1 =>
                         {
                             b1.IsRequired();
 
-                            b1.Property<decimal>("Amount")
+                            b1.Property<decimal>("Value")
                                 .HasColumnType("numeric(18,2)")
-                                .HasColumnName("Valor");
+                                .HasColumnName("Amount");
                         });
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DataCriacao");
+                    b.HasIndex("CreatedAt");
 
                     b.HasIndex("Status");
 
@@ -75,7 +75,7 @@ namespace Orders.Core.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("Data")
+                    b.Property<DateTimeOffset>("ChangedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid>("OrderId")
@@ -88,7 +88,7 @@ namespace Orders.Core.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OrderId", "Data");
+                    b.HasIndex("OrderId", "ChangedAt");
 
                     b.ToTable("OrderStatusHistory", (string)null);
                 });
@@ -144,7 +144,7 @@ namespace Orders.Core.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("Orders.Core.Domain.Orders.OrderStatusHistory", b =>
                 {
                     b.HasOne("Orders.Core.Domain.Orders.Order", null)
-                        .WithMany("Historico")
+                        .WithMany("StatusHistory")
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -152,7 +152,7 @@ namespace Orders.Core.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Orders.Core.Domain.Orders.Order", b =>
                 {
-                    b.Navigation("Historico");
+                    b.Navigation("StatusHistory");
                 });
 #pragma warning restore 612, 618
         }

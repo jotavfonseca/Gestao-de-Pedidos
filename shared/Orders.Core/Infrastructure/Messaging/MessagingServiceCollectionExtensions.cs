@@ -9,8 +9,8 @@ namespace Orders.Core.Infrastructure.Messaging;
 public static class MessagingServiceCollectionExtensions
 {
     /// <summary>
-    /// Registra o <see cref="ServiceBusClient"/> (singleton), os senders e o
-    /// publicador do outbox. Lê ConnectionStrings:ServiceBus.
+    /// Registers the <see cref="ServiceBusClient"/> (singleton), the senders and the
+    /// outbox publisher. Reads ConnectionStrings:ServiceBus.
     /// </summary>
     public static IServiceCollection AddServiceBusMessaging(this IServiceCollection services, IConfiguration configuration)
     {
@@ -18,8 +18,8 @@ public static class MessagingServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
-                "ConnectionStrings:ServiceBus não configurada. Defina SERVICEBUS_CONNECTION_STRING no .env " +
-                "ou desative a mensageria com Messaging:Enabled=false.");
+                "ConnectionStrings:ServiceBus is not configured. Set SERVICEBUS_CONNECTION_STRING in .env " +
+                "or disable messaging with Messaging:Enabled=false.");
         }
 
         services.TryAddSingleton(TimeProvider.System);
@@ -40,7 +40,7 @@ public static class MessagingServiceCollectionExtensions
         return services;
     }
 
-    /// <summary>Lê a seção Messaging; usado para decidir se a mensageria deve ser registrada.</summary>
+    /// <summary>Reads the Messaging section; used to decide whether messaging is registered.</summary>
     public static MessagingOptions GetMessagingOptions(this IConfiguration configuration) =>
         configuration.GetSection(MessagingOptions.SectionName).Get<MessagingOptions>() ?? new MessagingOptions();
 }

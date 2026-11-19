@@ -4,15 +4,15 @@ public sealed class MessagingOptions
 {
     public const string SectionName = "Messaging";
 
-    /// <summary>Desliga Service Bus, outbox publisher e consumidores (usado nos testes da API).</summary>
+    /// <summary>Turns off Service Bus, the outbox publisher and the consumers (used by the API tests).</summary>
     public bool Enabled { get; set; } = true;
 
-    /// <summary>Intervalo de varredura do outbox.</summary>
+    /// <summary>Outbox polling interval.</summary>
     public int OutboxIntervalMilliseconds { get; set; } = 1000;
 
-    /// <summary>Quantidade máxima de mensagens publicadas por varredura.</summary>
+    /// <summary>Maximum number of messages published per scan.</summary>
     public int OutboxBatchSize { get; set; } = 20;
 
-    /// <summary>Após esse número de falhas a mensagem fica parada no outbox para análise.</summary>
+    /// <summary>After this many failures the message stays in the outbox for analysis.</summary>
     public int OutboxMaxAttempts { get; set; } = 10;
 }

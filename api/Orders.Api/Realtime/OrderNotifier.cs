@@ -11,8 +11,8 @@ public interface IOrderNotifier
 public sealed record OrderStatusChangedNotification(Guid OrderId, OrderStatus Status, DateTimeOffset ChangedAt);
 
 /// <summary>
-/// Envia a notificação a todos os clientes conectados. Falhas são só
-/// registradas: o frontend tem fallback de polling (spec 06).
+/// Sends the notification to every connected client. Failures are only logged:
+/// the frontend has a polling fallback (spec 06).
 /// </summary>
 internal sealed class SignalROrderNotifier(IHubContext<OrdersHub> hub, ILogger<SignalROrderNotifier> logger) : IOrderNotifier
 {
@@ -27,7 +27,7 @@ internal sealed class SignalROrderNotifier(IHubContext<OrdersHub> hub, ILogger<S
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogWarning(ex, "Falha ao notificar a mudança de status do pedido {OrderId} via SignalR.", orderId);
+            logger.LogWarning(ex, "Failed to notify the status change of order {OrderId} over SignalR.", orderId);
         }
     }
 }

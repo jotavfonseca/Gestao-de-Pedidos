@@ -2,8 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// Em desenvolvimento, o Vite faz o mesmo papel do nginx no Docker:
-// /api → API (sem o prefixo) e /hubs → SignalR (com WebSocket).
+// In development, Vite plays the same role as nginx in Docker:
+// /api → API (prefix stripped) and /hubs → SignalR (with WebSocket).
 const apiTarget = process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:5000'
 
 export default defineConfig({

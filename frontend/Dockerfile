@@ -1,4 +1,4 @@
-# Build: Vite 7 exige Node >= 20
+# Build: Vite 7 requires Node >= 20
 FROM node:22-alpine AS build
 WORKDIR /app
 
@@ -8,7 +8,7 @@ RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-# Runtime: nginx serve o SPA e faz proxy de /api e /hubs para a API
+# Runtime: nginx serves the SPA and proxies /api and /hubs to the API
 FROM nginx:1.27-alpine AS runtime
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
