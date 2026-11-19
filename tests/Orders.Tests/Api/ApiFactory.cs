@@ -6,8 +6,8 @@ using Orders.Tests.Infrastructure;
 namespace Orders.Tests.Api;
 
 /// <summary>
-/// API real em memória apontando para o PostgreSQL do Testcontainers.
-/// Service Bus desligado (Messaging:Enabled=false) e IA sem chave.
+/// The real API in memory, pointing to the Testcontainers PostgreSQL.
+/// Service Bus is off (Messaging:Enabled=false) and the AI has no key.
 /// </summary>
 public sealed class ApiFactory(PostgresFixture postgres) : WebApplicationFactory<OrdersController>
 {

@@ -3,7 +3,7 @@ using Orders.Core.Observability;
 
 namespace Orders.Core.Infrastructure.Messaging;
 
-/// <summary>Cria spans de mensageria ligados ao traceparent recebido (spec 08).</summary>
+/// <summary>Creates messaging spans linked to the received traceparent (spec 08).</summary>
 internal static class MessagingActivity
 {
     public static Activity? Start(string name, ActivityKind kind, string? traceParent, string queue, string messageId, string? orderId)

@@ -3,7 +3,7 @@ using Orders.Core.Domain.Abstractions;
 namespace Orders.Core.Domain.Orders;
 
 public sealed class InvalidStatusTransitionException(Guid orderId, OrderStatus from, OrderStatus to)
-    : DomainException($"Transição de status inválida para o pedido {orderId}: {from} → {to}. Sequência permitida: Pendente → Processando → Finalizado.")
+    : DomainException($"Invalid status transition for order {orderId}: {from} → {to}. Allowed sequence: Pending → Processing → Completed.")
 {
     public Guid OrderId { get; } = orderId;
     public OrderStatus From { get; } = from;

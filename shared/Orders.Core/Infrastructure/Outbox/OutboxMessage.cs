@@ -1,8 +1,8 @@
 namespace Orders.Core.Infrastructure.Outbox;
 
 /// <summary>
-/// Mensagem pendente de publicação. Gravada na mesma transação da mudança
-/// de estado que a originou (Outbox Pattern).
+/// A message waiting to be published. Written in the same transaction as the
+/// state change that produced it (Outbox Pattern).
 /// </summary>
 public sealed class OutboxMessage
 {
@@ -10,10 +10,10 @@ public sealed class OutboxMessage
 
     public Guid Id { get; private set; }
 
-    /// <summary>EventType publicado (ex.: OrderCreated).</summary>
+    /// <summary>Published EventType (e.g. OrderCreated).</summary>
     public string Type { get; private set; } = null!;
 
-    /// <summary>Fila de destino no Service Bus.</summary>
+    /// <summary>Target Service Bus queue.</summary>
     public string Destination { get; private set; } = null!;
 
     public string Payload { get; private set; } = null!;

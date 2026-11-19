@@ -7,8 +7,8 @@ using Orders.Core.Infrastructure.Messaging;
 namespace Orders.Worker;
 
 /// <summary>
-/// Adaptador entre a fila e o caso de uso: valida a mensagem, chama
-/// <see cref="ProcessOrderHandler"/> (idempotente) e decide como liquidá-la.
+/// Adapter between the queue and the use case: validates the message, calls
+/// <see cref="ProcessOrderHandler"/> (idempotent) and decides how to settle it.
 /// </summary>
 public sealed class OrderCreatedHandler(ProcessOrderHandler processOrder, ILogger<OrderCreatedHandler> logger)
 {
@@ -18,7 +18,7 @@ public sealed class OrderCreatedHandler(ProcessOrderHandler processOrder, ILogge
         if (eventType as string != MessagingConstants.EventTypes.OrderCreated)
         {
             return ConsumeResult.ToDeadLetter("UnexpectedEventType",
-                $"EventType '{eventType ?? "(ausente)"}' não é tratado na fila {MessagingConstants.Queues.OrderCreated}.");
+                $"EventType '{eventType ?? "(missing)"}' is not handled on queue {MessagingConstants.Queues.OrderCreated}.");
         }
 
         OrderCreatedMessage? payload;
@@ -28,24 +28,24 @@ public sealed class OrderCreatedHandler(ProcessOrderHandler processOrder, ILogge
         }
         catch (JsonException ex)
         {
-            return ConsumeResult.ToDeadLetter("InvalidBody", $"JSON inválido: {ex.Message}");
+            return ConsumeResult.ToDeadLetter("InvalidBody", $"Invalid JSON: {ex.Message}");
         }
 
         if (payload is null || payload.OrderId == Guid.Empty)
         {
-            return ConsumeResult.ToDeadLetter("InvalidBody", "Mensagem sem OrderId.");
+            return ConsumeResult.ToDeadLetter("InvalidBody", "Message has no OrderId.");
         }
 
         if (message.CorrelationId != payload.OrderId.ToString())
         {
-            logger.LogWarning("CorrelationId {CorrelationId} difere do OrderId {OrderId} da mensagem.",
+            logger.LogWarning("CorrelationId {CorrelationId} differs from the message OrderId {OrderId}.",
                 message.CorrelationId, payload.OrderId);
         }
 
         var outcome = await processOrder.HandleAsync(payload.OrderId, cancellationToken);
 
         return outcome == ProcessOrderOutcome.OrderNotFound
-            ? ConsumeResult.ToDeadLetter("OrderNotFound", $"Pedido {payload.OrderId} não encontrado.")
+            ? ConsumeResult.ToDeadLetter("OrderNotFound", $"Order {payload.OrderId} was not found.")
             : ConsumeResult.Complete;
     }
 }

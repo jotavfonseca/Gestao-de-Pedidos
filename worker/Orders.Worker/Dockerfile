@@ -1,4 +1,4 @@
-# Contexto de build: raiz do repositório (precisa de shared/ e dos Directory.*.props)
+# Build context: repository root (needs shared/ and the Directory.*.props files)
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 

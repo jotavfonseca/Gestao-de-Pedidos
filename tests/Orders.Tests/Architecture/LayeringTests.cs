@@ -3,7 +3,7 @@ using Orders.Core.Domain.Orders;
 
 namespace Orders.Tests.Architecture;
 
-/// <summary>Garante a regra de dependências do DDD tático (constitution.md §4).</summary>
+/// <summary>Enforces the tactical DDD dependency rule (constitution.md §4).</summary>
 public class LayeringTests
 {
     private static readonly Assembly Core = typeof(Order).Assembly;
@@ -12,14 +12,14 @@ public class LayeringTests
     public void Domain_does_not_depend_on_infrastructure()
     {
         var violations = ReferencesFrom("Orders.Core.Domain", "Microsoft.EntityFrameworkCore", "Npgsql", "Azure");
-        Assert.True(violations.Count == 0, "Domínio depende de infraestrutura:\n" + string.Join("\n", violations));
+        Assert.True(violations.Count == 0, "Domain depends on infrastructure:\n" + string.Join("\n", violations));
     }
 
     [Fact]
     public void Application_does_not_depend_on_service_bus()
     {
         var violations = ReferencesFrom("Orders.Core.Application", "Azure");
-        Assert.True(violations.Count == 0, "Aplicação depende do Service Bus:\n" + string.Join("\n", violations));
+        Assert.True(violations.Count == 0, "Application depends on Service Bus:\n" + string.Join("\n", violations));
     }
 
     private static List<string> ReferencesFrom(string @namespace, params string[] forbiddenAssemblyPrefixes)

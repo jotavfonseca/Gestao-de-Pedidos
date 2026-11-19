@@ -5,7 +5,7 @@ using Orders.Core.Infrastructure.Messaging;
 
 namespace Orders.Api.Realtime;
 
-/// <summary>Repassa as mudanças de status publicadas pelo worker aos clientes SignalR.</summary>
+/// <summary>Forwards the status changes published by the worker to SignalR clients.</summary>
 internal sealed class StatusChangedConsumer(
     ServiceBusClient client,
     IServiceScopeFactory scopeFactory,
@@ -21,13 +21,13 @@ internal sealed class StatusChangedConsumer(
         if (!message.ApplicationProperties.TryGetValue(MessagingConstants.Properties.EventType, out var eventType)
             || eventType as string != MessagingConstants.EventTypes.OrderStatusChanged)
         {
-            return ConsumeResult.ToDeadLetter("UnexpectedEventType", $"EventType '{eventType}' não é tratado nesta fila.");
+            return ConsumeResult.ToDeadLetter("UnexpectedEventType", $"EventType '{eventType}' is not handled on this queue.");
         }
 
         var payload = MessageSerializer.Deserialize<OrderStatusChangedMessage>(message.Body);
         if (payload is null || !Enum.TryParse<OrderStatus>(payload.Status, out var status))
         {
-            return ConsumeResult.ToDeadLetter("InvalidBody", "Corpo da mensagem inválido.");
+            return ConsumeResult.ToDeadLetter("InvalidBody", "Invalid message body.");
         }
 
         var notifier = services.GetRequiredService<IOrderNotifier>();

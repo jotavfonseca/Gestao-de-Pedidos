@@ -18,7 +18,7 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(m => m.TraceParent).HasMaxLength(100);
         builder.Property(m => m.LastError).HasMaxLength(OutboxMessage.MaxErrorLength);
 
-        // Consulta do publicador: pendentes em ordem de criação.
+        // Publisher query: pending messages in creation order.
         builder.HasIndex(m => new { m.ProcessedAt, m.CreatedAt });
     }
 }

@@ -3,25 +3,25 @@ using System.Globalization;
 namespace Orders.Core.Domain.Orders;
 
 /// <summary>
-/// Valor monetário do pedido: sempre positivo e com 2 casas decimais.
-/// Igualdade por valor (record).
+/// Monetary amount of an order: always positive, with 2 decimal places.
+/// Value equality (record).
 /// </summary>
 public sealed record Money
 {
-    public decimal Amount { get; }
+    public decimal Value { get; }
 
-    private Money(decimal amount) => Amount = amount;
+    private Money(decimal value) => Value = value;
 
     public static Money Of(decimal value)
     {
         var rounded = Math.Round(value, 2, MidpointRounding.AwayFromZero);
         if (rounded <= 0)
         {
-            throw new DomainValidationException("valor", "O valor deve ser maior que zero.");
+            throw new DomainValidationException("amount", "Amount must be greater than zero.");
         }
 
         return new Money(rounded);
     }
 
-    public override string ToString() => Amount.ToString("0.00", CultureInfo.InvariantCulture);
+    public override string ToString() => Value.ToString("0.00", CultureInfo.InvariantCulture);
 }

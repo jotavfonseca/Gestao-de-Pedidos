@@ -9,7 +9,7 @@ using Orders.Worker;
 
 namespace Orders.Tests.Worker;
 
-/// <summary>Validação da mensagem e liquidação (complete / dead-letter) no worker.</summary>
+/// <summary>Message validation and settlement (complete / dead-letter) in the worker.</summary>
 [Collection(PostgresCollection.Name)]
 public sealed class OrderCreatedHandlerTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -23,7 +23,7 @@ public sealed class OrderCreatedHandlerTests(PostgresFixture postgres) : IAsyncL
         Guid orderId;
         await using (var db = postgres.CreateContext())
         {
-            var order = Order.Create("Ana", "Teclado", Money.Of(10m), DateTimeOffset.UtcNow);
+            var order = Order.Create("Jane Doe", "Keyboard", Money.Of(10m), DateTimeOffset.UtcNow);
             db.Orders.Add(order);
             await db.SaveChangesAsync();
             orderId = order.Id;
@@ -69,7 +69,7 @@ public sealed class OrderCreatedHandlerTests(PostgresFixture postgres) : IAsyncL
     }
 
     private static string Body(Guid orderId) =>
-        MessageSerializer.Serialize(new OrderCreatedMessage(orderId, "Ana", "Teclado", 10m, DateTimeOffset.UtcNow));
+        MessageSerializer.Serialize(new OrderCreatedMessage(orderId, "Jane Doe", "Keyboard", 10m, DateTimeOffset.UtcNow));
 
     private static ServiceBusReceivedMessage Message(string eventType, string body, Guid? correlationId = null) =>
         ServiceBusModelFactory.ServiceBusReceivedMessage(

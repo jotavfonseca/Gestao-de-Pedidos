@@ -8,7 +8,7 @@ var builder = Host.CreateApplicationBuilder(args);
 var configuration = builder.Configuration;
 
 var postgres = configuration.GetConnectionString("Postgres")
-    ?? throw new InvalidOperationException("ConnectionStrings:Postgres não configurada.");
+    ?? throw new InvalidOperationException("ConnectionStrings:Postgres is not configured.");
 
 builder.Logging.Configure(options => options.ActivityTrackingOptions =
     ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId);
@@ -21,10 +21,10 @@ builder.Logging.AddSimpleConsole(options =>
 
 builder.Services.AddOptions<WorkerOptions>().BindConfiguration(WorkerOptions.SectionName);
 
-// Domínio, aplicação e persistência (o worker não aplica migrations: isso é papel da API)
+// Domain, application and persistence (the worker does not apply migrations: that is the API's job)
 builder.Services.AddOrdersPersistence(postgres).AddOrdersApplication();
 
-// Mensageria: consome order-created e publica OrderStatusChanged pelo outbox
+// Messaging: consumes order-created and publishes OrderStatusChanged through the outbox
 builder.Services.AddServiceBusMessaging(configuration);
 builder.Services.AddScoped<OrderCreatedHandler>();
 builder.Services.AddHostedService<OrderCreatedConsumer>();

@@ -3,8 +3,8 @@ using Microsoft.Extensions.Options;
 namespace Orders.Worker;
 
 /// <summary>
-/// O worker não expõe HTTP; o healthcheck do Compose verifica se este
-/// arquivo foi atualizado no último minuto.
+/// The worker has no HTTP endpoint; the Compose healthcheck checks that this
+/// file was updated within the last minute.
 /// </summary>
 internal sealed class Heartbeat(IOptions<WorkerOptions> options, TimeProvider clock, ILogger<Heartbeat> logger) : BackgroundService
 {
@@ -23,14 +23,14 @@ internal sealed class Heartbeat(IOptions<WorkerOptions> options, TimeProvider cl
                 }
                 catch (IOException ex)
                 {
-                    logger.LogWarning(ex, "Não foi possível atualizar o heartbeat em {File}.", settings.HeartbeatFile);
+                    logger.LogWarning(ex, "Could not update the heartbeat at {File}.", settings.HeartbeatFile);
                 }
             }
             while (await timer.WaitForNextTickAsync(stoppingToken));
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // Encerramento normal.
+            // Normal shutdown.
         }
     }
 }

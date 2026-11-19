@@ -6,8 +6,8 @@ using System.Text.Json.Nodes;
 namespace Orders.Tests.Golden;
 
 /// <summary>
-/// Compara um JSON com o arquivo versionado em tests/Orders.Tests/Golden/files.
-/// Para regenerar após uma mudança intencional de contrato:
+/// Compares JSON with the versioned file in tests/Orders.Tests/Golden/files.
+/// To regenerate after an intentional contract change:
 /// <c>UPDATE_GOLDEN=1 dotnet test</c>.
 /// </summary>
 internal static class GoldenFile
@@ -15,7 +15,7 @@ internal static class GoldenFile
     private static readonly JsonSerializerOptions Indented = new()
     {
         WriteIndented = true,
-        // Arquivo legível no diff (acentos e "+" sem escape); só usado em teste.
+        // Readable diffs (no escaping of non-ASCII or "+"); test-only.
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
@@ -30,7 +30,7 @@ internal static class GoldenFile
             File.WriteAllText(path, actual + Environment.NewLine);
             if (Environment.GetEnvironmentVariable("UPDATE_GOLDEN") != "1")
             {
-                Xunit.Assert.Fail($"Golden file criado em {path}. Revise e rode os testes de novo.");
+                Xunit.Assert.Fail($"Golden file created at {path}. Review it and run the tests again.");
             }
 
             return;
@@ -39,10 +39,10 @@ internal static class GoldenFile
         var expected = Normalize(File.ReadAllText(path));
         Xunit.Assert.True(expected == actual,
             $"""
-            O contrato '{name}' mudou. Se a mudança for intencional, rode: UPDATE_GOLDEN=1 dotnet test
-            --- esperado ({path})
+            The '{name}' contract changed. If this is intentional, run: UPDATE_GOLDEN=1 dotnet test
+            --- expected ({path})
             {expected}
-            --- atual
+            --- actual
             {actual}
             """);
     }

@@ -7,7 +7,7 @@ using Orders.Tests.Infrastructure;
 
 namespace Orders.Tests.Api;
 
-/// <summary>Testes HTTP da API (spec 02) com PostgreSQL real.</summary>
+/// <summary>HTTP tests of the API (spec 02) against a real PostgreSQL.</summary>
 [Collection(PostgresCollection.Name)]
 public sealed class OrdersApiTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -30,14 +30,14 @@ public sealed class OrdersApiTests(PostgresFixture postgres) : IAsyncLifetime
     public async Task Post_creates_pending_order_and_outbox_message()
     {
         var response = await Client.PostAsJsonAsync("/orders",
-            new { cliente = "Ana", produto = "Teclado", valor = 199.9m, status = "Finalizado" });
+            new { customer = "Jane Doe", product = "Keyboard", amount = 199.9m, status = "Completed" });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var id = body.GetProperty("id").GetGuid();
         Assert.Equal($"/orders/{id}", response.Headers.Location!.AbsolutePath);
-        Assert.Equal("Pendente", body.GetProperty("status").GetString()); // status do cliente é ignorado
-        Assert.Equal(199.9m, body.GetProperty("valor").GetDecimal());
+        Assert.Equal("Pending", body.GetProperty("status").GetString()); // a client-sent status is ignored
+        Assert.Equal(199.9m, body.GetProperty("amount").GetDecimal());
 
         await using var db = postgres.CreateContext();
         var message = await db.OutboxMessages.SingleAsync();
@@ -47,24 +47,24 @@ public sealed class OrdersApiTests(PostgresFixture postgres) : IAsyncLifetime
     [DockerFact]
     public async Task Post_with_invalid_fields_returns_validation_problem()
     {
-        var response = await Client.PostAsJsonAsync("/orders", new { cliente = "", produto = new string('x', 101), valor = 0 });
+        var response = await Client.PostAsJsonAsync("/orders", new { customer = "", product = new string('x', 101), amount = 0 });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         var errors = (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
-        Assert.True(errors.TryGetProperty("cliente", out _));
-        Assert.True(errors.TryGetProperty("produto", out _));
-        Assert.True(errors.TryGetProperty("valor", out _));
+        Assert.Equal("Customer is required.", errors.GetProperty("customer")[0].GetString());
+        Assert.True(errors.TryGetProperty("product", out _));
+        Assert.True(errors.TryGetProperty("amount", out _));
     }
 
     [DockerFact]
-    public async Task Get_by_id_returns_order_with_history()
+    public async Task Get_by_id_returns_order_with_status_history()
     {
-        var created = await CreateAsync("Ana");
+        var created = await CreateAsync("Jane Doe");
 
         var body = await Client.GetFromJsonAsync<JsonElement>($"/orders/{created}");
 
-        var history = body.GetProperty("historico").EnumerateArray().ToList();
-        Assert.Equal("Pendente", Assert.Single(history).GetProperty("status").GetString());
+        var history = body.GetProperty("statusHistory").EnumerateArray().ToList();
+        Assert.Equal("Pending", Assert.Single(history).GetProperty("status").GetString());
     }
 
     [DockerFact]
@@ -79,12 +79,12 @@ public sealed class OrdersApiTests(PostgresFixture postgres) : IAsyncLifetime
     [DockerFact]
     public async Task List_returns_newest_first()
     {
-        await CreateAsync("Primeiro");
-        await CreateAsync("Segundo");
+        await CreateAsync("First");
+        await CreateAsync("Second");
 
         var body = await Client.GetFromJsonAsync<JsonElement>("/orders");
 
-        Assert.Equal(["Segundo", "Primeiro"], body.EnumerateArray().Select(o => o.GetProperty("cliente").GetString()));
+        Assert.Equal(["Second", "First"], body.EnumerateArray().Select(o => o.GetProperty("customer").GetString()));
     }
 
     [DockerFact]
@@ -100,13 +100,13 @@ public sealed class OrdersApiTests(PostgresFixture postgres) : IAsyncLifetime
         var status = await Client.GetFromJsonAsync<JsonElement>("/orders/ask/status");
         Assert.False(status.GetProperty("enabled").GetBoolean());
 
-        var response = await Client.PostAsJsonAsync("/orders/ask", new { question = "Quantos pedidos estão pendentes?" });
+        var response = await Client.PostAsJsonAsync("/orders/ask", new { question = "How many orders are pending?" });
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
     }
 
-    private async Task<Guid> CreateAsync(string cliente)
+    private async Task<Guid> CreateAsync(string customer)
     {
-        var response = await Client.PostAsJsonAsync("/orders", new { cliente, produto = "Teclado", valor = 10m });
+        var response = await Client.PostAsJsonAsync("/orders", new { customer, product = "Keyboard", amount = 10m });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
     }

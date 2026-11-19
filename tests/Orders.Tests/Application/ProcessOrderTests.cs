@@ -9,7 +9,7 @@ using Orders.Tests.Infrastructure;
 
 namespace Orders.Tests.Application;
 
-/// <summary>Idempotência do processamento (spec 04) contra PostgreSQL real.</summary>
+/// <summary>Processing idempotency (spec 04) against a real PostgreSQL.</summary>
 [Collection(PostgresCollection.Name)]
 public sealed class ProcessOrderTests(PostgresFixture postgres) : IAsyncLifetime
 {
@@ -18,31 +18,31 @@ public sealed class ProcessOrderTests(PostgresFixture postgres) : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [DockerFact]
-    public async Task Processes_pending_order_until_finalized()
+    public async Task Processes_pending_order_until_completed()
     {
         var orderId = await SeedAsync();
 
         var outcome = await HandleAsync(orderId);
 
-        Assert.Equal(ProcessOrderOutcome.Finalized, outcome);
+        Assert.Equal(ProcessOrderOutcome.Completed, outcome);
         var order = await LoadAsync(orderId);
-        Assert.Equal(OrderStatus.Finalizado, order.Status);
+        Assert.Equal(OrderStatus.Completed, order.Status);
         Assert.Equal(
-            [OrderStatus.Pendente, OrderStatus.Processando, OrderStatus.Finalizado],
-            order.Historico.OrderBy(h => h.Data).Select(h => h.Status));
+            [OrderStatus.Pending, OrderStatus.Processing, OrderStatus.Completed],
+            order.StatusHistory.OrderBy(h => h.ChangedAt).Select(h => h.Status));
         Assert.Equal(2, await CountStatusChangedMessagesAsync());
     }
 
     [DockerFact]
-    public async Task Duplicate_message_after_finalized_changes_nothing()
+    public async Task Duplicate_message_after_completion_changes_nothing()
     {
         var orderId = await SeedAsync();
         await HandleAsync(orderId);
 
         var outcome = await HandleAsync(orderId);
 
-        Assert.Equal(ProcessOrderOutcome.AlreadyFinalized, outcome);
-        Assert.Equal(3, (await LoadAsync(orderId)).Historico.Count);
+        Assert.Equal(ProcessOrderOutcome.AlreadyCompleted, outcome);
+        Assert.Equal(3, (await LoadAsync(orderId)).StatusHistory.Count);
         Assert.Equal(2, await CountStatusChangedMessagesAsync());
     }
 
@@ -52,31 +52,31 @@ public sealed class ProcessOrderTests(PostgresFixture postgres) : IAsyncLifetime
         var orderId = await SeedAsync();
         await using (var db = postgres.CreateContext())
         {
-            var order = await db.Orders.Include(o => o.Historico).SingleAsync(o => o.Id == orderId);
-            order.TransitionTo(OrderStatus.Processando, DateTimeOffset.UtcNow);
+            var order = await db.Orders.Include(o => o.StatusHistory).SingleAsync(o => o.Id == orderId);
+            order.TransitionTo(OrderStatus.Processing, DateTimeOffset.UtcNow);
             await db.SaveChangesAsync();
         }
 
         var outcome = await HandleAsync(orderId);
 
-        Assert.Equal(ProcessOrderOutcome.Finalized, outcome);
-        var history = (await LoadAsync(orderId)).Historico.Select(h => h.Status).ToList();
-        Assert.Equal(1, history.Count(s => s == OrderStatus.Processando));
+        Assert.Equal(ProcessOrderOutcome.Completed, outcome);
+        var history = (await LoadAsync(orderId)).StatusHistory.Select(h => h.Status).ToList();
+        Assert.Equal(1, history.Count(s => s == OrderStatus.Processing));
         Assert.Equal(3, history.Count);
     }
 
     [DockerFact]
-    public async Task Concurrent_deliveries_finalize_exactly_once()
+    public async Task Concurrent_deliveries_complete_exactly_once()
     {
         var orderId = await SeedAsync();
 
         var outcomes = await Task.WhenAll(HandleAsync(orderId, delaySeconds: 1), HandleAsync(orderId, delaySeconds: 1));
 
-        Assert.Single(outcomes, o => o == ProcessOrderOutcome.Finalized);
-        Assert.Single(outcomes, o => o == ProcessOrderOutcome.AlreadyFinalized);
+        Assert.Single(outcomes, o => o == ProcessOrderOutcome.Completed);
+        Assert.Single(outcomes, o => o == ProcessOrderOutcome.AlreadyCompleted);
         var order = await LoadAsync(orderId);
-        Assert.Equal(OrderStatus.Finalizado, order.Status);
-        Assert.Equal(3, order.Historico.Count);
+        Assert.Equal(OrderStatus.Completed, order.Status);
+        Assert.Equal(3, order.StatusHistory.Count);
         Assert.Equal(2, await CountStatusChangedMessagesAsync());
     }
 
@@ -89,7 +89,7 @@ public sealed class ProcessOrderTests(PostgresFixture postgres) : IAsyncLifetime
     private async Task<Guid> SeedAsync()
     {
         await using var db = postgres.CreateContext();
-        var order = Order.Create("Ana", "Teclado", Money.Of(100m), DateTimeOffset.UtcNow);
+        var order = Order.Create("Jane Doe", "Keyboard", Money.Of(100m), DateTimeOffset.UtcNow);
         db.Orders.Add(order);
         await db.SaveChangesAsync();
         return order.Id;
@@ -110,7 +110,7 @@ public sealed class ProcessOrderTests(PostgresFixture postgres) : IAsyncLifetime
     private async Task<Order> LoadAsync(Guid orderId)
     {
         await using var db = postgres.CreateContext();
-        return await db.Orders.AsNoTracking().Include(o => o.Historico).SingleAsync(o => o.Id == orderId);
+        return await db.Orders.AsNoTracking().Include(o => o.StatusHistory).SingleAsync(o => o.Id == orderId);
     }
 
     private async Task<int> CountStatusChangedMessagesAsync()

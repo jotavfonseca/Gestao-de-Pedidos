@@ -12,9 +12,9 @@ using Orders.Core.Infrastructure.Persistence;
 namespace Orders.Core.Infrastructure.Outbox;
 
 /// <summary>
-/// Publica no Service Bus as mensagens pendentes do outbox. Usa
-/// FOR UPDATE SKIP LOCKED para que várias instâncias não enviem a mesma
-/// mensagem. Entrega at-least-once: duplicatas são absorvidas pelos consumidores.
+/// Publishes pending outbox messages to Service Bus. Uses
+/// FOR UPDATE SKIP LOCKED so several instances never send the same message.
+/// At-least-once delivery: duplicates are absorbed by the consumers.
 /// </summary>
 public sealed class OutboxPublisher(
     IServiceScopeFactory scopeFactory,
@@ -34,25 +34,25 @@ public sealed class OutboxPublisher(
             {
                 try
                 {
-                    // Esvazia o backlog em lotes antes de esperar o próximo tick.
+                    // Drain the backlog in batches before waiting for the next tick.
                     while (await PublishBatchAsync(settings, stoppingToken) == settings.OutboxBatchSize)
                     {
                     }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    logger.LogError(ex, "Falha ao varrer o outbox; nova tentativa no próximo ciclo.");
+                    logger.LogError(ex, "Failed to scan the outbox; retrying on the next cycle.");
                 }
             }
             while (await timer.WaitForNextTickAsync(stoppingToken));
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
-            // Encerramento normal.
+            // Normal shutdown.
         }
     }
 
-    /// <returns>Quantidade de mensagens publicadas com sucesso.</returns>
+    /// <returns>Number of messages published successfully.</returns>
     internal async Task<int> PublishBatchAsync(MessagingOptions settings, CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
@@ -83,17 +83,17 @@ public sealed class OutboxPublisher(
             {
                 message.MarkFailed(ex.Message);
                 logger.LogWarning(ex,
-                    "Falha ao publicar a mensagem {MessageId} ({EventType}) do pedido {OrderId}; tentativa {Attempts}.",
+                    "Failed to publish message {MessageId} ({EventType}) for order {OrderId}; attempt {Attempts}.",
                     message.Id, message.Type, message.CorrelationId, message.Attempts);
 
                 if (message.Attempts >= settings.OutboxMaxAttempts)
                 {
                     logger.LogError(
-                        "Mensagem {MessageId} atingiu {MaxAttempts} tentativas e ficará parada no outbox para análise.",
+                        "Message {MessageId} reached {MaxAttempts} attempts and will stay in the outbox for analysis.",
                         message.Id, settings.OutboxMaxAttempts);
                 }
 
-                // Provavelmente o Service Bus está indisponível: para o lote e tenta no próximo ciclo.
+                // Service Bus is probably down: stop this batch and retry on the next cycle.
                 break;
             }
         }
@@ -103,7 +103,7 @@ public sealed class OutboxPublisher(
 
         if (published > 0)
         {
-            logger.LogDebug("{Count} mensagem(ns) publicada(s) a partir do outbox.", published);
+            logger.LogDebug("Published {Count} message(s) from the outbox.", published);
         }
 
         return published;

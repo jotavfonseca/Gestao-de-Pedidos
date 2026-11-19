@@ -9,8 +9,8 @@ namespace Orders.Core.Observability;
 public static class TelemetryServiceCollectionExtensions
 {
     /// <summary>
-    /// Liga o tracing (OpenTelemetry → OTLP) somente se OTEL_EXPORTER_OTLP_ENDPOINT
-    /// estiver configurado; sem ele, a aplicação roda normalmente sem exportar.
+    /// Enables tracing (OpenTelemetry → OTLP) only when OTEL_EXPORTER_OTLP_ENDPOINT is
+    /// set; without it the application runs normally and exports nothing.
     /// </summary>
     public static IServiceCollection AddOrdersTelemetry(
         this IServiceCollection services,

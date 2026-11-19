@@ -5,13 +5,13 @@ using Orders.Tests.Infrastructure;
 
 namespace Orders.Tests.Ai;
 
-/// <summary>Ferramentas do módulo IA (spec 10) com dados conhecidos.</summary>
+/// <summary>AI module tools (spec 10) with known data.</summary>
 [Collection(PostgresCollection.Name)]
 public sealed class OrderAnalyticsToolsTests(PostgresFixture postgres) : IAsyncLifetime
 {
     private static readonly TimeZoneInfo SaoPaulo = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
 
-    // 19/11/2026 10:00 em São Paulo (UTC-3)
+    // Nov 19, 2026 10:00 in São Paulo (UTC-3)
     private static readonly DateTimeOffset Today = new(2026, 11, 19, 13, 0, 0, TimeSpan.Zero);
 
     public async Task InitializeAsync()
@@ -20,11 +20,11 @@ public sealed class OrderAnalyticsToolsTests(PostgresFixture postgres) : IAsyncL
         await postgres.ResetAsync();
 
         await using var db = postgres.CreateContext();
-        // Finalizado hoje em 6 s; finalizado hoje em 10 s; pendente hoje;
-        // pendente às 23:00 de ontem em São Paulo (02:00 UTC de hoje).
+        // Completed today in 6 s; completed today in 10 s; pending today;
+        // pending at 23:00 yesterday in São Paulo (02:00 UTC today).
         db.Orders.AddRange(
-            Finalized(Order.Create("A", "P1", Money.Of(100m), Today), seconds: 6),
-            Finalized(Order.Create("B", "P2", Money.Of(50.5m), Today.AddMinutes(1)), seconds: 10),
+            Completed(Order.Create("A", "P1", Money.Of(100m), Today), seconds: 6),
+            Completed(Order.Create("B", "P2", Money.Of(50.5m), Today.AddMinutes(1)), seconds: 10),
             Order.Create("C", "P3", Money.Of(20m), Today.AddMinutes(2)),
             Order.Create("D", "P4", Money.Of(7m), new DateTimeOffset(2026, 11, 19, 2, 0, 0, TimeSpan.Zero)));
         await db.SaveChangesAsync();
@@ -35,26 +35,26 @@ public sealed class OrderAnalyticsToolsTests(PostgresFixture postgres) : IAsyncL
     [DockerFact]
     public async Task Counts_by_status()
     {
-        var result = await RunAsync(OrderAnalyticsTools.CountOrders, new { status = "Pendente" });
-        Assert.Equal(2, result.GetProperty("quantidade").GetInt32());
+        var result = await RunAsync(OrderAnalyticsTools.CountOrders, new { status = "Pending" });
+        Assert.Equal(2, result.GetProperty("count").GetInt32());
     }
 
     [DockerFact]
-    public async Task Dates_without_offset_use_sao_paulo_time_zone()
+    public async Task Dates_without_offset_use_the_configured_time_zone()
     {
         var result = await RunAsync(OrderAnalyticsTools.CountOrders, new { from = "2026-11-19", to = "2026-11-20" });
 
-        // O pedido das 23:00 de 18/11 (horário de Brasília) fica de fora.
-        Assert.Equal(3, result.GetProperty("quantidade").GetInt32());
+        // The order created at 23:00 on Nov 18 (São Paulo time) is left out.
+        Assert.Equal(3, result.GetProperty("count").GetInt32());
     }
 
     [DockerFact]
-    public async Task Sums_values_of_finalized_orders()
+    public async Task Sums_amounts_of_completed_orders()
     {
-        var result = await RunAsync(OrderAnalyticsTools.SumOrderValues, new { status = "Finalizado" });
+        var result = await RunAsync(OrderAnalyticsTools.SumOrderAmounts, new { status = "Completed" });
 
-        Assert.Equal(150.5m, result.GetProperty("valorTotal").GetDecimal());
-        Assert.Equal(75.25m, result.GetProperty("ticketMedio").GetDecimal());
+        Assert.Equal(150.5m, result.GetProperty("totalAmount").GetDecimal());
+        Assert.Equal(75.25m, result.GetProperty("averageAmount").GetDecimal());
     }
 
     [DockerFact]
@@ -62,10 +62,10 @@ public sealed class OrderAnalyticsToolsTests(PostgresFixture postgres) : IAsyncL
     {
         var result = await RunAsync(OrderAnalyticsTools.AverageProcessingTime, new { });
 
-        Assert.Equal(2, result.GetProperty("pedidosConsiderados").GetInt32());
-        Assert.Equal(8, result.GetProperty("mediaSegundos").GetDouble());
-        Assert.Equal(6, result.GetProperty("minimoSegundos").GetDouble());
-        Assert.Equal(10, result.GetProperty("maximoSegundos").GetDouble());
+        Assert.Equal(2, result.GetProperty("ordersConsidered").GetInt32());
+        Assert.Equal(8, result.GetProperty("averageSeconds").GetDouble());
+        Assert.Equal(6, result.GetProperty("minSeconds").GetDouble());
+        Assert.Equal(10, result.GetProperty("maxSeconds").GetDouble());
     }
 
     [DockerFact]
@@ -73,17 +73,17 @@ public sealed class OrderAnalyticsToolsTests(PostgresFixture postgres) : IAsyncL
     {
         var result = await RunAsync(OrderAnalyticsTools.OrdersByStatus, new { });
 
-        var counts = result.GetProperty("porStatus").EnumerateArray()
-            .ToDictionary(e => e.GetProperty("status").GetString()!, e => e.GetProperty("quantidade").GetInt32());
-        Assert.Equal(new Dictionary<string, int> { ["Pendente"] = 2, ["Processando"] = 0, ["Finalizado"] = 2 }, counts);
+        var counts = result.GetProperty("byStatus").EnumerateArray()
+            .ToDictionary(e => e.GetProperty("status").GetString()!, e => e.GetProperty("count").GetInt32());
+        Assert.Equal(new Dictionary<string, int> { ["Pending"] = 2, ["Processing"] = 0, ["Completed"] = 2 }, counts);
     }
 
     [DockerFact]
     public async Task Rejects_invalid_parameters()
     {
-        await Assert.ThrowsAsync<ToolInputException>(() => RunAsync(OrderAnalyticsTools.CountOrders, new { status = "Cancelado" }));
+        await Assert.ThrowsAsync<ToolInputException>(() => RunAsync(OrderAnalyticsTools.CountOrders, new { status = "Cancelled" }));
         await Assert.ThrowsAsync<ToolInputException>(() => RunAsync(OrderAnalyticsTools.ListRecentOrders, new { limit = 500 }));
-        await Assert.ThrowsAsync<ToolInputException>(() => RunAsync(OrderAnalyticsTools.CountOrders, new { from = "ontem" }));
+        await Assert.ThrowsAsync<ToolInputException>(() => RunAsync(OrderAnalyticsTools.CountOrders, new { from = "yesterday" }));
         await Assert.ThrowsAsync<ToolInputException>(() => RunAsync("drop_table", new { }));
     }
 
@@ -95,10 +95,10 @@ public sealed class OrderAnalyticsToolsTests(PostgresFixture postgres) : IAsyncL
         return JsonDocument.Parse(await tools.ExecuteAsync(tool, arguments, CancellationToken.None)).RootElement;
     }
 
-    private static Order Finalized(Order order, int seconds)
+    private static Order Completed(Order order, int seconds)
     {
-        order.TransitionTo(OrderStatus.Processando, order.DataCriacao.AddSeconds(1));
-        order.TransitionTo(OrderStatus.Finalizado, order.DataCriacao.AddSeconds(seconds));
+        order.TransitionTo(OrderStatus.Processing, order.CreatedAt.AddSeconds(1));
+        order.TransitionTo(OrderStatus.Completed, order.CreatedAt.AddSeconds(seconds));
         return order;
     }
 }

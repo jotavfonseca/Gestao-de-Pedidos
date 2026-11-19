@@ -11,7 +11,7 @@ internal static class HealthEndpoints
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     /// <summary>
-    /// /health/live: só o processo da API. /health/ready e /health: API, PostgreSQL e Service Bus.
+    /// /health/live: the API process only. /health/ready and /health: API, PostgreSQL and Service Bus.
     /// </summary>
     public static void MapOrdersHealthChecks(this IEndpointRouteBuilder endpoints)
     {

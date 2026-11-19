@@ -6,15 +6,15 @@ using Testcontainers.PostgreSql;
 namespace Orders.Tests.Infrastructure;
 
 /// <summary>
-/// PostgreSQL real em container (Testcontainers), migrado uma vez por
-/// execução. Cada teste chama <see cref="ResetAsync"/> para começar limpo.
+/// A real PostgreSQL in a container (Testcontainers), migrated once per run.
+/// Each test calls <see cref="ResetAsync"/> to start from a clean state.
 /// </summary>
 public sealed class PostgresFixture : IAsyncLifetime
 {
     private PostgreSqlContainer? _container;
 
     public string ConnectionString => _container?.GetConnectionString()
-        ?? throw new InvalidOperationException("Docker indisponível: o container não foi iniciado.");
+        ?? throw new InvalidOperationException("Docker is unavailable: the container was not started.");
 
     public async Task InitializeAsync()
     {

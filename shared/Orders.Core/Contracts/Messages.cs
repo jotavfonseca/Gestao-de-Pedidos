@@ -4,19 +4,19 @@ using System.Text.Json.Serialization;
 namespace Orders.Core.Contracts;
 
 /// <summary>
-/// Contratos publicados no Service Bus. São estáveis e independentes dos
-/// eventos de domínio: o domínio pode evoluir sem quebrar consumidores.
+/// Contracts published to Service Bus. They are stable and independent from the
+/// domain events, so the domain can evolve without breaking consumers.
 /// </summary>
 public sealed record OrderCreatedMessage(
     Guid OrderId,
-    string Cliente,
-    string Produto,
-    decimal Valor,
-    DateTimeOffset DataCriacao);
+    string Customer,
+    string Product,
+    decimal Amount,
+    DateTimeOffset CreatedAt);
 
 public sealed record OrderStatusChangedMessage(
     Guid OrderId,
-    string StatusAnterior,
+    string PreviousStatus,
     string Status,
     DateTimeOffset ChangedAt);
 

@@ -6,8 +6,8 @@ namespace Orders.Api.Ai;
 internal static class AiServiceCollectionExtensions
 {
     /// <summary>
-    /// Registra o módulo de IA. Sem chave (Ai:ApiKey ou ANTHROPIC_API_KEY),
-    /// registra uma implementação desativada e o endpoint responde 503.
+    /// Registers the AI module. Without a key (Ai:ApiKey or ANTHROPIC_API_KEY) a
+    /// disabled implementation is registered and the endpoint returns 503.
     /// </summary>
     public static IServiceCollection AddOrderAnalytics(this IServiceCollection services, IConfiguration configuration)
     {

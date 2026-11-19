@@ -8,8 +8,8 @@ internal static class DatabaseMigrator
     private const int MaxAttempts = 10;
 
     /// <summary>
-    /// Aplica as migrations pendentes antes de aceitar requisições, tentando
-    /// novamente enquanto o PostgreSQL ainda estiver subindo.
+    /// Applies pending migrations before accepting requests, retrying while
+    /// PostgreSQL is still starting up.
     /// </summary>
     public static async Task MigrateDatabaseAsync(this WebApplication app, CancellationToken cancellationToken = default)
     {
@@ -22,14 +22,14 @@ internal static class DatabaseMigrator
                 await using var scope = app.Services.CreateAsyncScope();
                 var db = scope.ServiceProvider.GetRequiredService<OrderContext>();
                 await db.Database.MigrateAsync(cancellationToken);
-                logger.LogInformation("Banco de dados atualizado (migrations aplicadas).");
+                logger.LogInformation("Database is up to date (migrations applied).");
                 return;
             }
             catch (Exception ex) when (attempt < MaxAttempts && ex is not OperationCanceledException)
             {
                 var delay = TimeSpan.FromSeconds(Math.Min(attempt * 2, 10));
                 logger.LogWarning(
-                    "Banco indisponível para migrations (tentativa {Attempt}/{MaxAttempts}): {Error}. Nova tentativa em {Delay}s.",
+                    "Database unavailable for migrations (attempt {Attempt}/{MaxAttempts}): {Error}. Retrying in {Delay}s.",
                     attempt, MaxAttempts, ex.Message, delay.TotalSeconds);
                 await Task.Delay(delay, cancellationToken);
             }

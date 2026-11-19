@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace Orders.Core.Infrastructure.Persistence;
 
-/// <summary>Permite rodar `dotnet ef` sem subir a API.</summary>
+/// <summary>Lets `dotnet ef` run without starting the API.</summary>
 internal sealed class DesignTimeOrderContextFactory : IDesignTimeDbContextFactory<OrderContext>
 {
     public OrderContext CreateDbContext(string[] args)

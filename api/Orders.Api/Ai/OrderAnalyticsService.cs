@@ -11,10 +11,10 @@ public sealed record AskResult(string Answer, IReadOnlyList<ToolCallInfo> ToolCa
 
 public sealed record ToolCallInfo(string Name, IReadOnlyDictionary<string, JsonElement> Input, bool IsError);
 
-/// <summary>O módulo de IA está desligado (sem ANTHROPIC_API_KEY).</summary>
-public sealed class AiDisabledException() : Exception("Módulo de IA desativado: configure ANTHROPIC_API_KEY.");
+/// <summary>The AI module is turned off (no ANTHROPIC_API_KEY).</summary>
+public sealed class AiDisabledException() : Exception("AI module disabled: set ANTHROPIC_API_KEY.");
 
-/// <summary>Falha ao falar com a API da Anthropic (limite, indisponibilidade, erro).</summary>
+/// <summary>Failure talking to the Anthropic API (rate limit, outage, error).</summary>
 public sealed class AiUnavailableException(string message, Exception inner, bool transient) : Exception(message, inner)
 {
     public bool Transient { get; } = transient;
@@ -35,9 +35,9 @@ internal sealed class DisabledOrderAnalyticsService : IOrderAnalyticsService
 }
 
 /// <summary>
-/// Responde perguntas em linguagem natural sobre os pedidos. O Claude
-/// interpreta a pergunta, chama as ferramentas de <see cref="OrderAnalyticsTools"/>
-/// (consultas fixas, somente leitura) e redige a resposta com os números reais.
+/// Answers natural-language questions about orders. Claude interprets the
+/// question, calls the <see cref="OrderAnalyticsTools"/> (fixed, read-only
+/// queries) and writes the answer with the real numbers.
 /// </summary>
 internal sealed class ClaudeOrderAnalyticsService(
     AnthropicClient client,
@@ -50,23 +50,23 @@ internal sealed class ClaudeOrderAnalyticsService(
     private const string FallbackBeta = "server-side-fallback-2026-07-01";
 
     private const string SystemPrompt = """
-        Você é o assistente de análise do sistema "Gestão de Pedidos".
-        Responda em português do Brasil, de forma amigável e direta, usando apenas
-        dados obtidos pelas ferramentas disponíveis. Nunca invente números.
+        You are the analytics assistant of the "Order Management" system.
+        Answer in English, in a friendly and direct way, using only data returned
+        by the available tools. Never make up numbers.
 
-        Regras:
-        - Sempre consulte uma ferramenta antes de citar qualquer quantidade, valor ou tempo.
-        - Converta períodos relativos ("hoje", "ontem", "esta semana", "este mês") em
-          datas usando a data atual e o fuso informados na mensagem do usuário.
-          Use 'from' inclusivo e 'to' exclusivo (ex.: hoje = de hoje 00:00 até amanhã 00:00).
-        - Status possíveis: Pendente, Processando, Finalizado. "Aprovar" um pedido
-          significa levá-lo até Finalizado.
-        - Valores monetários em reais, no formato brasileiro (ex.: R$ 1.234,50).
-          Tempos em unidades legíveis (segundos, minutos, horas).
-        - Diga de forma breve o que foi medido e o período considerado.
-        - Você só tem acesso de leitura. Se pedirem para criar, alterar ou apagar
-          pedidos, explique educadamente que não pode fazer isso.
-        - Se a pergunta não for sobre os pedidos, diga que só responde sobre pedidos.
+        Rules:
+        - Always call a tool before stating any count, amount or duration.
+        - Turn relative periods ("today", "yesterday", "this week", "this month") into
+          dates using the current date and time zone given in the user's message.
+          Use an inclusive 'from' and an exclusive 'to' (e.g. today = from today 00:00 to tomorrow 00:00).
+        - Possible statuses: Pending, Processing, Completed. "Approving" an order
+          means taking it to Completed.
+        - Format amounts in US dollars (e.g. $1,234.50) and durations in readable
+          units (seconds, minutes, hours).
+        - Briefly say what was measured and for which period.
+        - You only have read access. If asked to create, change or delete orders,
+          politely explain that you cannot do that.
+        - If the question is not about orders, say you can only answer questions about orders.
         """;
 
     public bool Enabled => true;
@@ -85,8 +85,8 @@ internal sealed class ClaudeOrderAnalyticsService(
                 {
                     new BetaTextBlockParam
                     {
-                        Text = $"Data e hora atual: {now.ToString("yyyy-MM-dd HH:mm (dddd)", CultureInfo.GetCultureInfo("pt-BR"))} " +
-                               $"— fuso {settings.TimeZone} (UTC{now:zzz})."
+                        Text = $"Current date and time: {now.ToString("yyyy-MM-dd HH:mm (dddd)", CultureInfo.InvariantCulture)} " +
+                               $"— time zone {settings.TimeZone} (UTC{now:zzz})."
                     },
                     new BetaTextBlockParam { Text = question }
                 }
@@ -99,8 +99,8 @@ internal sealed class ClaudeOrderAnalyticsService(
 
             if (response.StopReason == "refusal")
             {
-                logger.LogWarning("Pergunta recusada pelo modelo: {Details}", response.StopDetails);
-                return new AskResult("Não posso responder a essa pergunta. Tente perguntar algo sobre os pedidos.", toolCalls);
+                logger.LogWarning("Question refused by the model: {Details}", response.StopDetails);
+                return new AskResult("I can't answer that question. Try asking something about the orders.", toolCalls);
             }
 
             var assistantContent = new List<BetaContentBlockParam>();
@@ -116,7 +116,7 @@ internal sealed class ClaudeOrderAnalyticsService(
                 }
                 else if (block.TryPickThinking(out var thinking))
                 {
-                    // Blocos de thinking voltam inalterados (com assinatura) para o modelo.
+                    // Thinking blocks go back to the model unchanged (with their signature).
                     assistantContent.Add(new BetaThinkingBlockParam { Thinking = thinking.Thinking, Signature = thinking.Signature });
                 }
                 else if (block.TryPickRedactedThinking(out var redacted))
@@ -133,15 +133,15 @@ internal sealed class ClaudeOrderAnalyticsService(
             if (response.StopReason != "tool_use" || toolResults.Count == 0)
             {
                 var text = string.Join("\n\n", answer).Trim();
-                return new AskResult(text.Length > 0 ? text : "Não consegui formular uma resposta. Tente reformular a pergunta.", toolCalls);
+                return new AskResult(text.Length > 0 ? text : "I couldn't put together an answer. Try rephrasing the question.", toolCalls);
             }
 
             messages.Add(new BetaAssistantMessageParam { Content = assistantContent });
             messages.Add(new BetaUserMessageParam { Content = toolResults });
         }
 
-        logger.LogWarning("Limite de {MaxIterations} iterações de tool use atingido.", settings.MaxIterations);
-        return new AskResult("A pergunta exigiu consultas demais. Tente algo mais específico.", toolCalls);
+        logger.LogWarning("Reached the limit of {MaxIterations} tool-use iterations.", settings.MaxIterations);
+        return new AskResult("This question needed too many queries. Try something more specific.", toolCalls);
     }
 
     private async Task<BetaMessage> SendAsync(AiOptions settings, List<BetaMessageParam> messages, CancellationToken cancellationToken)
@@ -155,26 +155,26 @@ internal sealed class ClaudeOrderAnalyticsService(
                 System = SystemPrompt,
                 Tools = OrderAnalyticsToolDefinitions.All,
                 Messages = messages,
-                // Se o modelo recusar por política, o servidor tenta outro modelo na mesma chamada.
+                // If the model refuses for policy reasons, the server retries with another model in the same call.
                 Betas = [FallbackBeta],
                 Fallbacks = new Default()
             }, cancellationToken);
         }
         catch (AnthropicRateLimitException ex)
         {
-            throw new AiUnavailableException("Limite de uso da IA atingido. Tente novamente em instantes.", ex, transient: true);
+            throw new AiUnavailableException("AI rate limit reached. Please try again shortly.", ex, transient: true);
         }
         catch (Anthropic5xxException ex)
         {
-            throw new AiUnavailableException("Serviço de IA indisponível no momento.", ex, transient: true);
+            throw new AiUnavailableException("The AI service is unavailable right now.", ex, transient: true);
         }
         catch (AnthropicApiException ex)
         {
-            throw new AiUnavailableException("Falha ao consultar o serviço de IA.", ex, transient: false);
+            throw new AiUnavailableException("The AI service request failed.", ex, transient: false);
         }
         catch (HttpRequestException ex)
         {
-            throw new AiUnavailableException("Não foi possível conectar ao serviço de IA.", ex, transient: true);
+            throw new AiUnavailableException("Could not connect to the AI service.", ex, transient: true);
         }
     }
 
@@ -189,7 +189,7 @@ internal sealed class ClaudeOrderAnalyticsService(
         {
             var result = await tools.ExecuteAsync(name, input, cancellationToken);
             toolCalls.Add(new ToolCallInfo(name, input, IsError: false));
-            logger.LogInformation("Ferramenta {Tool} executada com {Input}.", name, JsonSerializer.Serialize(input));
+            logger.LogInformation("Tool {Tool} executed with {Input}.", name, JsonSerializer.Serialize(input));
             return new BetaToolResultBlockParam { ToolUseID = id, Content = result };
         }
         catch (ToolInputException ex)
