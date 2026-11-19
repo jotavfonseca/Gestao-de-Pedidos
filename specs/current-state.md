@@ -1,60 +1,61 @@
-# Estado atual (diagnóstico de 19/11/2026)
+# Starting point (assessment of Nov 19, 2026)
 
-Retrato do projeto **antes** das specs 01–13. Serve de linha de base: cada
-problema listado aqui é resolvido por pelo menos uma spec.
+A snapshot of the project **before** specs 01–13. It is the baseline: every problem
+listed here is solved by at least one spec. Names are the original Portuguese ones
+used by the code at the time.
 
-## Resumo
+## Summary
 
-O projeto **não roda de ponta a ponta**: o worker não compila, a API não publica
-no Service Bus, o worker não está no Compose e a tela de detalhes não existe.
+The project **did not run end to end**: the worker did not compile, the API did not
+publish to Service Bus, the worker was not in Compose, and the details page did not exist.
 
-## Por área
+## By area
 
 ### API — `api/Orders.Api`
 
-| Existe | Problema | Resolvido em |
+| Existed | Problem | Solved in |
 |--------|----------|--------------|
-| `POST /orders`, `GET /orders`, `GET /orders/{id}` | POST recebe a entidade EF inteira (cliente pode mandar `status`, `historico`); captura exceção e relança `Exception` genérica | 02 |
-| `ServiceBusPublisher` | **Nunca é chamado** ("Nenhuma publicação na fila"); cria um sender por envio e nunca descarta; usa `Subject` em vez de `EventType` | 03 |
-| `OrderContext` + migration `InitialCreate` | `OrderStatusHistory` está na migration mas não tem `DbSet` | 01 |
-| `OrderStatus` enum | Serializado como número; o frontend espera texto | 02 |
-| `/health` | Só checa o Postgres; nada da fila | 05 |
-| Migrations no startup | Sem retry: se o banco demorar, a API cai | 02 |
-| `Orders.Api.http` | Aponta para `/weatherforecast` (template) | 02 |
+| `POST /orders`, `GET /orders`, `GET /orders/{id}` | POST accepted the whole EF entity (clients could send `status`, `historico`); caught exceptions and rethrew a generic `Exception` | 02 |
+| `ServiceBusPublisher` | **Never called** (comment: "no publishing to the queue"); created a sender per send and never disposed it; used `Subject` instead of `EventType` | 03 |
+| `OrderContext` + `InitialCreate` migration | `OrderStatusHistory` was in the migration but had no `DbSet` | 01 |
+| `OrderStatus` enum | Serialized as a number; the frontend expected text | 02 |
+| `/health` | Only checked PostgreSQL; nothing for the queue | 05 |
+| Migrations on startup | No retry: if the database was slow, the API crashed | 02 |
+| `Orders.Api.http` | Pointed to `/weatherforecast` (template leftover) | 02 |
 
 ### Worker — `worker/Orders.Worker`
 
-| Existe | Problema | Resolvido em |
+| Existed | Problem | Solved in |
 |--------|----------|--------------|
-| `BackgroundService` com Pendente → Processando → Finalizado e 5 s | **Não compila**: usa `_context.Historico`, que não existe no `OrderContext` | 01, 04 |
-| Injeção de `OrderContext` | `DbContext` scoped dentro de hosted service singleton → erro na inicialização | 04 |
-| Leitura de pedidos | **Polling no banco**; não usa Service Bus; sem idempotência real | 04 |
-| `ProjectReference` para a API | Worker depende do projeto Web; Dockerfile com contexto só do worker não enxerga a API | 01, 04 |
-| — | **Não está no docker-compose** | 11 |
+| `BackgroundService` doing Pendente → Processando → Finalizado with 5 s | **Did not compile**: used `_context.Historico`, which did not exist on `OrderContext` | 01, 04 |
+| `OrderContext` injection | Scoped `DbContext` inside a singleton hosted service → startup error | 04 |
+| Reading orders | **Polling the database**; did not use Service Bus; no real idempotency | 04 |
+| `ProjectReference` to the API | Worker depended on the web project; a Dockerfile with only the worker as context could not see the API | 01, 04 |
+| — | **Not in docker-compose** | 11 |
 
 ### Frontend — `frontend`
 
-| Existe | Problema | Resolvido em |
+| Existed | Problem | Solved in |
 |--------|----------|--------------|
-| Lista de pedidos com badge | Sem atualização automática de status | 06, 09 |
-| Formulário de criação | Sem validação além de `required` | 09 |
-| `OrderDetails.jsx` | **É cópia do formulário de criação**; não exibe detalhes | 07, 09 |
-| Tailwind | Não está ligado: `index.css` é CSS pré-compilado estático; `@tailwindcss/vite` instalado e não usado; `input.css`/`postcss.config.mjs` soltos | 09 |
-| `services/api.js` | URL fixa `http://localhost:5000` | 09 |
-| Dockerfile | Node 18 (Vite 7 exige Node ≥ 20) | 09 |
-| — | Sobras do template Vite (`App.css`, `react.svg`, `.eslintrc.json` legado, título "Vite + React") | 09 |
+| Orders list with a badge | No automatic status updates | 06, 09 |
+| Create form | No validation beyond `required` | 09 |
+| `OrderDetails.jsx` | **A copy of the create form**; showed no details | 07, 09 |
+| Tailwind | Not wired: `index.css` was a static precompiled CSS; `@tailwindcss/vite` installed but unused; stray `input.css`/`postcss.config.mjs` | 09 |
+| `services/api.js` | Hard-coded URL `http://localhost:5000` | 09 |
+| Dockerfile | Node 18 (Vite 7 requires Node ≥ 20) | 09 |
+| — | Vite template leftovers (`App.css`, `react.svg`, legacy `.eslintrc.json`, "Vite + React" title) | 09 |
 
-### Infraestrutura
+### Infrastructure
 
-| Existe | Problema | Resolvido em |
+| Existed | Problem | Solved in |
 |--------|----------|--------------|
-| Compose com postgres, pgadmin, api, frontend | Sem worker e sem Service Bus; `version:` obsoleto; healthcheck do frontend usa `wget` sem garantia | 11 |
-| `.env` | Não há `.env.example`; `.gitignore` usa `*.env` | 11 |
+| Compose with postgres, pgadmin, api, frontend | No worker and no Service Bus; obsolete `version:`; frontend healthcheck relied on `wget` without guarantees | 11 |
+| `.env` | No `.env.example`; `.gitignore` used `*.env` | 11 |
 
-### Documentação e testes
+### Documentation and tests
 
-| Existe | Problema | Resolvido em |
+| Existed | Problem | Solved in |
 |--------|----------|--------------|
-| `README.md` | Genérico; cita caminhos inexistentes (`./src/Api/Api.csproj`) e variáveis que não são usadas | 13 |
-| — | **Nenhum teste automatizado** | 12 |
-| — | Sem diagrama de arquitetura | 13 |
+| `README.md` | Generic; referenced non-existent paths (`./src/Api/Api.csproj`) and unused variables | 13 |
+| — | **No automated tests** | 12 |
+| — | No architecture diagram | 13 |

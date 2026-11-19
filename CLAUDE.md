@@ -1,27 +1,31 @@
-# Gestão de Pedidos — contexto para o Claude
+# Order Management — context for Claude
 
-Este projeto é a solução do desafio técnico **POC TMB**. A especificação completa
-(requisitos, regras de negócio, bônus e critérios de avaliação) está em:
+This project is the solution to the **POC TMB** technical challenge. The full brief
+(requirements, business rules, bonuses and evaluation criteria) is in Portuguese at:
 
 @docs/desafio-poc-tmb.md
 
-Ao fazer alterações, siga os requisitos desse documento (stack obrigatória:
-.NET + EF + PostgreSQL, React + TailwindCSS, Azure Service Bus, Docker Compose).
+An English summary is in `docs/challenge-brief.en.md`. Follow the brief's
+requirements when making changes (required stack: .NET + EF + PostgreSQL,
+React + TailwindCSS, Azure Service Bus, Docker Compose).
 
-Estrutura: `api/` (API REST em C#), `worker/` (consumidor do Service Bus),
-`shared/` (domínio, DbContext, migrations e contratos compartilhados),
-`tests/` (testes automatizados), `frontend/` (React), `infra/` (config do emulador
-do Service Bus e do pgAdmin), `specs/` (especificações),
-`docker-compose.yml` na raiz.
+Everything in the project is in **English** (code, domain, API, UI, logs, comments,
+docs, commits). The brief's Portuguese field and status names were renamed on
+purpose — see `specs/15-english-adaptation.md` for the mapping.
+
+Layout: `api/` (C# REST API), `worker/` (Service Bus consumer), `shared/` (domain,
+DbContext, migrations and shared contracts), `tests/` (automated tests),
+`frontend/` (React), `infra/` (Service Bus emulator and pgAdmin config),
+`specs/` (specifications), `docker-compose.yml` at the root.
 
 ## Spec Driven Development
 
-O projeto segue SDD. Antes de alterar código:
+The project follows SDD. Before changing code:
 
-1. Leia `specs/constitution.md` (princípios que valem para tudo) e a spec da
-   feature envolvida em `specs/NN-*.md`. O índice e o status estão em `specs/README.md`.
-2. Implemente para cumprir os **critérios de aceite** da spec, task por task.
-3. Ao concluir, marque as tasks `[x]`, atualize o **Status** da spec e a tabela
-   de `specs/README.md`.
-4. Se o escopo mudar, atualize a spec **antes** do código. Mudança sem spec
-   correspondente: crie a spec primeiro.
+1. Read `specs/constitution.md` (principles that apply to everything) and the spec
+   of the feature involved in `specs/NN-*.md`. The index and statuses are in `specs/README.md`.
+2. Implement to meet the spec's **acceptance criteria**, task by task.
+3. When done, tick the tasks `[x]`, update the spec's **Status** and the table in
+   `specs/README.md`.
+4. If the scope changes, update the spec **before** the code. A change with no
+   matching spec: write the spec first.

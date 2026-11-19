@@ -1,58 +1,63 @@
-# Specs — Gestão de Pedidos
+# Specs — Order Management
 
-Este projeto segue **Spec Driven Development (SDD)**: toda mudança começa por uma
-especificação aqui em `specs/`, e o código é escrito para cumprir os critérios de
-aceite dela.
+This project follows **Spec Driven Development (SDD)**: every change starts with a
+specification in `specs/`, and the code is written to meet its acceptance criteria.
 
-- [`constitution.md`](constitution.md) — princípios fixos (stack, regras do desafio, arquitetura DDD tática, convenções, definição de pronto).
-- [`current-state.md`](current-state.md) — diagnóstico do projeto antes desta rodada de specs.
-- Requisitos originais: [`../docs/desafio-poc-tmb.md`](../docs/desafio-poc-tmb.md).
+- [`constitution.md`](constitution.md) — fixed principles (stack, challenge rules, tactical DDD architecture, conventions, definition of done).
+- [`current-state.md`](current-state.md) — assessment of the project before this round of specs.
+- Original requirements: [`../docs/desafio-poc-tmb.md`](../docs/desafio-poc-tmb.md) (Portuguese) · [English summary](../docs/challenge-brief.en.md).
 
 ## Features
 
-| # | Feature | Tipo | Pontos | Status |
+| # | Feature | Type | Points | Status |
 |---|---------|------|--------|--------|
-| 01 | [Base compartilhada e domínio (DDD tático)](01-base-compartilhada.md) | Fundação | — | Concluída |
-| 02 | [API REST](02-api-rest.md) | Obrigatória | — | Concluída |
-| 03 | [Outbox + Service Bus](03-outbox-service-bus.md) | Obrigatória + bônus | +3 | Concluída |
-| 04 | [Worker idempotente](04-worker-idempotente.md) | Obrigatória | — | Concluída |
-| 05 | [Health checks](05-health-checks.md) | Obrigatória | — | Concluída |
-| 06 | [Tempo real com SignalR + fallback](06-signalr-fallback.md) | Bônus | +3 | Concluída |
-| 07 | [Histórico de status](07-historico-status.md) | Bônus | +3 | Concluída |
-| 08 | [Tracing ponta a ponta](08-tracing.md) | Bônus | +2 | Concluída |
-| 09 | [Frontend (React + Tailwind)](09-frontend.md) | Obrigatória | — | Concluída |
-| 10 | [Módulo IA — Pergunte sobre os pedidos](10-modulo-ia.md) | Opcional / bônus | +5 | Em verificação |
-| 11 | [Infraestrutura (Docker Compose)](11-infraestrutura.md) | Obrigatória | — | Concluída |
-| 12 | [Testes automatizados](12-testes.md) | Bônus | +3 | Concluída |
-| 13 | [Documentação e DX](13-documentacao.md) | Obrigatória | — | Concluída |
-| 14 | [CI, README em inglês e builds reproduzíveis](14-ci-e-portfolio.md) | DX / apresentação | — | Em verificação |
+| 01 | [Shared core and domain (tactical DDD)](01-shared-core-and-domain.md) | Foundation | — | Done |
+| 02 | [REST API](02-rest-api.md) | Required | — | Done |
+| 03 | [Outbox + Service Bus](03-outbox-service-bus.md) | Required + bonus | +3 | Done |
+| 04 | [Idempotent worker](04-idempotent-worker.md) | Required | — | Done |
+| 05 | [Health checks](05-health-checks.md) | Required | — | Done |
+| 06 | [Real time with SignalR + fallback](06-signalr-fallback.md) | Bonus | +3 | Done |
+| 07 | [Status history](07-status-history.md) | Bonus | +3 | Done |
+| 08 | [End-to-end tracing](08-tracing.md) | Bonus | +2 | Done |
+| 09 | [Frontend (React + Tailwind)](09-frontend.md) | Required | — | Done |
+| 10 | [AI module — Ask about your orders](10-ai-module.md) | Optional / bonus | +5 | In verification |
+| 11 | [Infrastructure (Docker Compose)](11-infrastructure.md) | Required | — | Done |
+| 12 | [Automated tests](12-tests.md) | Bonus | +3 | Done |
+| 13 | [Documentation and DX](13-documentation.md) | Required | — | Done |
+| 14 | [CI, English README and reproducible builds](14-ci-and-portfolio.md) | DX / presentation | — | Done |
+| 15 | [English adaptation](15-english-adaptation.md) | DX / presentation | — | In verification |
 
-Status possíveis: `Planejada` → `Em andamento` → `Em verificação` (implementada, falta verificar algum critério) → `Concluída`.
+Statuses: `Planned` → `In progress` → `In verification` (implemented, some criterion still to verify) → `Done`.
 
-## Ordem de execução
+## Execution order
 
-01 → 02 → 03 → 04 → 05 → 07 → 06 → 08 → 10 → 09 → 11 → 12 → 13
+01 → 02 → 03 → 04 → 05 → 07 → 06 → 08 → 10 → 09 → 11 → 12 → 13 → 14 → 15
 
-O backend compila e é testado antes do frontend; o Compose vem por último para
-validar tudo junto.
+The backend is built and tested before the frontend; Compose comes last to
+validate everything together.
 
-## Fluxo de trabalho
+## Workflow
 
-1. **Especificar** — escrever ou ajustar a spec da feature (requisitos, critérios de aceite, design, tasks).
-2. **Implementar** — escrever o código para cumprir os critérios de aceite, uma task por vez.
-3. **Verificar** — rodar a seção *Verificação* da spec.
-4. **Atualizar** — marcar as tasks `[x]`, mudar o status na spec e nesta tabela.
+1. **Specify** — write or update the feature spec (requirements, acceptance criteria, design, tasks).
+2. **Implement** — write code to meet the acceptance criteria, one task at a time.
+3. **Verify** — run the spec's *Verification* section.
+4. **Update** — tick the tasks `[x]`, update the status in the spec and in this table.
 
-Mudou o escopo durante a implementação? Atualize a spec **antes** do código.
+Scope changed during implementation? Update the spec **before** the code.
 
-## Modelo de spec
+## Spec template
 
-Cada `NN-slug.md` tem as seções:
+Each `NN-slug.md` has these sections:
 
-- **Status** e **Pontuação**
-- **Contexto** — o que existe hoje e por que mudar
-- **Requisitos** — com referência à seção do desafio
-- **Critérios de aceite** — Dado / Quando / Então
-- **Design** — arquivos, componentes e decisões
+- **Status** and **Score**
+- **Context** — what exists today and why it should change
+- **Requirements** — referencing the challenge section
+- **Acceptance criteria** — Given / When / Then
+- **Design** — files, components and decisions
 - **Tasks** — checklist `- [ ] N.M`
-- **Verificação** — como provar cada critério
+- **Verification** — how to prove each criterion
+- **Implementation notes** — what was verified and what changed from the plan
+
+> **Naming note:** specs 01–14 were written while the domain still used the brief's
+> Portuguese names (`cliente`, `Pendente`, …). They were translated together with
+> the code in spec 15 and now use the English names (`customer`, `Pending`, …).

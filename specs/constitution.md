@@ -1,86 +1,92 @@
-# Constituição do projeto
+# Project constitution
 
-Princípios que valem para **todas** as features. Uma spec não pode contrariá-los;
-se for preciso, altere este arquivo primeiro, de forma explícita.
+Principles that apply to **every** feature. A spec cannot contradict them; if it
+must, change this file first, explicitly.
 
-## 1. Stack obrigatória (desafio)
+## 1. Required stack (challenge)
 
-| Camada | Tecnologia |
-|--------|-----------|
+| Layer | Technology |
+|-------|-----------|
 | Backend | C# / .NET 8, ASP.NET Core, Entity Framework Core, PostgreSQL |
-| Mensageria | Azure Service Bus (emulador oficial localmente; namespace real via connection string) |
+| Messaging | Azure Service Bus (official emulator locally; a real namespace via connection string) |
 | Frontend | React + TailwindCSS (Vite) |
-| Infra | Docker / Docker Compose |
-| IA (opcional) | Claude via SDK oficial `Anthropic` para C# |
+| Infrastructure | Docker / Docker Compose |
+| AI (optional) | Claude through the official `Anthropic` C# SDK |
 
-## 2. Regras de negócio inegociáveis
+## 2. Non-negotiable business rules
 
-1. Pedido tem `id`, `cliente`, `produto`, `valor`, `status`, `dataCriacao`.
-2. Status: `Pendente`, `Processando`, `Finalizado` — **somente** nessa sequência.
-3. Criar pedido = persistir no PostgreSQL via EF **e** publicar no Service Bus.
-4. Mensagens levam `CorrelationId = OrderId` e `EventType = OrderCreated`.
-5. O worker é **idempotente**: reprocessar a mesma mensagem nunca gera transição inválida nem histórico duplicado.
-6. Health checks cobrem API, banco e fila.
+1. An order has `id`, `customer`, `product`, `amount`, `status`, `createdAt`.
+2. Statuses: `Pending`, `Processing`, `Completed` — **only** in that sequence.
+3. Creating an order = persisting it to PostgreSQL through EF **and** publishing to Service Bus.
+4. Messages carry `CorrelationId = OrderId` and `EventType = OrderCreated`.
+5. The worker is **idempotent**: reprocessing the same message never causes an invalid transition or duplicated history.
+6. Health checks cover the API, the database and the queue.
 
-## 3. Estrutura do repositório
+> The challenge brief names these in Portuguese (`cliente`, `produto`, `valor`,
+> `data_criacao`; `Pendente`, `Processando`, `Finalizado`). They were renamed to
+> English on purpose to present the project to an international audience
+> ([spec 15](15-english-adaptation.md)); the rules themselves are unchanged.
+
+## 3. Repository layout
 
 ```
-api/Orders.Api/          API REST, outbox publisher, SignalR, módulo IA
-worker/Orders.Worker/    consumidor do Service Bus
-shared/Orders.Core/      Domain/ (agregado, value objects, eventos), Application/ (casos de uso),
-                         Infrastructure/ (DbContext, migrations, outbox), Contracts/ (mensagens)
-tests/Orders.Tests/      unitários, golden, integração (Testcontainers)
+api/Orders.Api/          REST API, outbox publisher, SignalR, AI module
+worker/Orders.Worker/    Service Bus consumer
+shared/Orders.Core/      Domain/ (aggregate, value objects, events), Application/ (use cases),
+                         Infrastructure/ (DbContext, migrations, outbox), Contracts/ (messages)
+tests/Orders.Tests/      unit, golden, integration (Testcontainers)
 frontend/                React + Tailwind
-specs/                   especificações (SDD)
-docs/                    enunciado do desafio
+infra/                   Service Bus emulator and pgAdmin configuration
+specs/                   specifications (SDD)
+docs/                    challenge brief
 ```
 
-## 4. Arquitetura: DDD tático, sem cerimônia estratégica
+## 4. Architecture: tactical DDD, no strategic ceremony
 
-O domínio é pequeno (um agregado, três status, uma regra central), então
-aplicamos **só os padrões táticos de DDD que resolvem problemas reais**:
+The domain is small (one aggregate, three statuses, one core rule), so we apply
+**only the tactical DDD patterns that solve real problems**:
 
-| Usamos | Para quê |
-|--------|----------|
-| **Agregado rico** (`Order`) | Invariantes protegidas no próprio modelo: setters privados, factory `Order.Create`, mudança de status só por `TransitionTo` |
-| **Value object** (`Money`) | Valor monetário sempre positivo e com 2 casas, garantido no domínio e não só no DTO |
-| **Eventos de domínio** | O agregado registra o que aconteceu (`OrderCreated`, `OrderStatusChanged`); a infraestrutura converte em mensagens de outbox no `SaveChanges` |
-| **Camada de aplicação fina** | Casos de uso (criar, consultar, processar) fora dos controllers e do host do worker |
-| **Exceções de domínio** | Violação de regra é erro de domínio, mapeado para HTTP na borda |
-| **Linguagem ubíqua** | Termos do negócio do desafio (`Cliente`, `Produto`, `Valor`, `Pendente`…) |
+| We use | For |
+|--------|-----|
+| **Rich aggregate** (`Order`) | Invariants protected by the model itself: private setters, `Order.Create` factory, status changes only through `TransitionTo` |
+| **Value object** (`Money`) | An amount is always positive and has 2 decimal places, guaranteed by the domain and not only by the DTO |
+| **Domain events** | The aggregate records what happened (`OrderCreated`, `OrderStatusChanged`); infrastructure turns them into outbox messages on `SaveChanges` |
+| **Thin application layer** | Use cases (create, query, process) live outside the controllers and the worker host |
+| **Domain exceptions** | A rule violation is a domain error, mapped to HTTP at the edge |
+| **Ubiquitous language** | Business terms from the challenge (`Customer`, `Product`, `Amount`, `Pending`…) |
 
-Deliberadamente **não** usamos:
+We deliberately **do not** use:
 
-- **Repositórios genéricos sobre o EF** — o `DbContext` já é unidade de trabalho e repositório.
-- **MediatR / CQRS formal** — três casos de uso não justificam o pipeline.
-- **Um projeto por camada** — `Orders.Core` separa `Domain/` (sem dependência de EF ou Service Bus) e `Infrastructure/` por pasta; a regra de dependência é verificada por teste (spec 12).
-- **Bounded contexts / context map** — existe um contexto só.
+- **Generic repositories over EF** — the `DbContext` already is the unit of work and repository.
+- **MediatR / formal CQRS** — three use cases do not justify the pipeline.
+- **One project per layer** — `Orders.Core` separates `Domain/` (no EF or Service Bus dependency) and `Infrastructure/` by folder; the dependency rule is enforced by a test (spec 12).
+- **Bounded contexts / context map** — there is a single context.
 
-Se o domínio crescer (pagamentos, estoque, clientes), essas decisões devem ser revistas aqui.
+If the domain grows (payments, inventory, customers), revisit these decisions here.
 
-## 5. Convenções de código
+## 5. Code conventions
 
-- **Domínio protege as regras**: transições de status só via `Order.TransitionTo`; nada de `order.Status = ...` fora do domínio.
-- **Domínio sem infraestrutura**: nada em `Orders.Core/Domain` referencia EF Core, Npgsql ou Azure SDK.
-- **Contratos explícitos**: a API nunca expõe nem recebe entidades EF diretamente — usa DTOs.
-- **JSON em camelCase**, enums como texto.
-- **Configuração por ambiente**: segredos e endereços vêm de variáveis de ambiente (`.env`); nada sensível versionado.
-- **Sem código morto**: o que foi substituído é removido, não comentado.
-- Nomes de domínio em português (como no desafio); código, infraestrutura e termos técnicos em inglês.
-- Logs estruturados (`ILogger` com templates), sempre com `OrderId` quando houver.
+- **The domain protects the rules**: status changes only through `Order.TransitionTo`; never `order.Status = ...` outside the domain.
+- **Domain without infrastructure**: nothing in `Orders.Core/Domain` references EF Core, Npgsql or the Azure SDK.
+- **Explicit contracts**: the API never exposes or accepts EF entities directly — it uses DTOs.
+- **camelCase JSON**, enums as strings.
+- **Configuration per environment**: secrets and addresses come from environment variables (`.env`); nothing sensitive is versioned.
+- **No dead code**: replaced code is removed, not commented out.
+- **English everywhere**: code, domain, API, UI, logs, comments, docs and commits.
+- Structured logs (`ILogger` with message templates), always including `OrderId` when there is one.
 
-## 6. Convenções de commit
+## 6. Commit conventions
 
-- Conventional Commits em português: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
-- Um commit por feature/task coerente, referenciando a spec (ex.: `feat(worker): consumidor idempotente [spec 04]`).
-- Nada direto na `main` sem revisão; trabalhar em branch.
+- Conventional Commits in English: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`, `ci:`.
+- One commit per coherent feature/layer, referencing the spec (e.g. `feat(worker): idempotent consumer [spec 04]`).
+- Nothing goes to `main` without review; work on a branch and open a PR.
 
-## 7. Definição de pronto
+## 7. Definition of done
 
-Uma feature está **Concluída** quando:
+A feature is **Done** when:
 
-1. Todas as tasks da spec estão `[x]`.
-2. Todos os critérios de aceite foram verificados (teste automatizado ou passo manual descrito na spec).
-3. `dotnet build` sem erros e `dotnet test` verde; no frontend, `npm run lint` e `npm run build` limpos.
-4. A spec e a tabela de [`README.md`](README.md) estão atualizadas.
-5. Se mudou como rodar ou configurar algo, o `README.md` da raiz e o `.env.example` foram atualizados.
+1. Every task in the spec is `[x]`.
+2. Every acceptance criterion was verified (automated test or a manual step described in the spec).
+3. `dotnet build` has no errors and `dotnet test` is green; in the frontend, `npm run lint` and `npm run build` are clean.
+4. The spec and the table in [`README.md`](README.md) are up to date.
+5. If running or configuring the project changed, the root `README.md` and `.env.example` were updated.
