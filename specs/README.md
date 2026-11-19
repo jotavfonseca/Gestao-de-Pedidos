@@ -25,7 +25,7 @@ specification in `specs/`, and the code is written to meet its acceptance criter
 | 12 | [Automated tests](12-tests.md) | Bonus | +3 | Done |
 | 13 | [Documentation and DX](13-documentation.md) | Required | — | Done |
 | 14 | [CI, English README and reproducible builds](14-ci-and-portfolio.md) | DX / presentation | — | Done |
-| 15 | [English adaptation](15-english-adaptation.md) | DX / presentation | — | In verification |
+| 15 | [English adaptation](15-english-adaptation.md) | DX / presentation | — | Done |
 
 Statuses: `Planned` → `In progress` → `In verification` (implemented, some criterion still to verify) → `Done`.
 

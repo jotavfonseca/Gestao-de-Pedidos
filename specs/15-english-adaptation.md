@@ -1,6 +1,6 @@
 # 15 — English adaptation for an international audience
 
-- **Status:** In verification
+- **Status:** Done
 - **Score:** Documentation & DX, Frontend & UX (presentation to US recruiters)
 
 ## Context
@@ -78,7 +78,7 @@ configurable (`Ai__TimeZone`, default `America/Sao_Paulo`).
 - [x] 15.6 Infra comments, `.env.example`, pgAdmin server name.
 - [x] 15.7 Specs translated and renamed; constitution updated.
 - [x] 15.8 `README.md` in English, `README.pt-BR.md`, English summary of the brief, `CLAUDE.md`.
-- [ ] 15.9 New PR with CI green.
+- [x] 15.9 New PR with CI green.
 
 ## Verification
 
@@ -95,3 +95,4 @@ configurable (`Ai__TimeZone`, default `America/Sao_Paulo`).
 - Verified: 53 tests passing; frontend lint/build clean; full flow in Compose (`Pending → Processing → Completed`, English validation errors, "Order Management" title).
 - The Compose project name and repository name stay `gestao-de-pedidos` / `Gestao-de-Pedidos` (renaming the GitHub repository is the owner's call). The local `.env` (git-ignored) keeps its Portuguese comments.
 - Commits from this spec on are in English; earlier commit messages stay in Portuguese (history is not rewritten).
+- PR #2: all three CI jobs green, 53 tests run on Linux and none skipped.
