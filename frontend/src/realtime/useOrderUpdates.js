@@ -4,8 +4,8 @@ import { useRealtime } from './context'
 export const POLLING_INTERVAL_MS = 5000
 
 /**
- * Recebe mudanças de status em tempo real e, enquanto o SignalR estiver
- * desconectado, chama `onPoll` a cada 5 s (fallback de polling).
+ * Receives status changes in real time and, while SignalR is disconnected,
+ * calls `onPoll` every 5 s (polling fallback).
  *
  * @param {(event: {orderId: string, status: string, changedAt: string}) => void} onEvent
  * @param {() => void} onPoll
@@ -28,7 +28,7 @@ export function useOrderUpdates(onEvent, onPoll) {
     return () => clearInterval(timer)
   }, [live])
 
-  // Ao reconectar, sincroniza uma vez: eventos podem ter sido perdidos.
+  // On reconnect, sync once: events may have been missed.
   const wasLive = useRef(live)
   useEffect(() => {
     if (live && !wasLive.current) handlers.current.onPoll?.()

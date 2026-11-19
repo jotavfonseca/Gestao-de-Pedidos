@@ -46,27 +46,27 @@ export default function OrderDetails() {
 
   useOrderUpdates(
     (event) => {
-      // Recarrega para trazer o histórico completo com a nova entrada.
+      // Reload to get the full history, including the new entry.
       if (event.orderId === id) load({ silent: true })
     },
     () => {
-      if (order?.status !== 'Finalizado') load({ silent: true })
+      if (order?.status !== 'Completed') load({ silent: true })
     },
   )
 
   if (notFound) {
     return (
       <Card className="mx-auto max-w-lg p-10 text-center">
-        <p className="text-lg font-semibold text-slate-900">Pedido não encontrado</p>
-        <p className="mt-1 text-sm text-slate-500">Verifique o endereço ou volte para a lista.</p>
-        <Link to="/" className="mt-5 inline-block font-medium text-brand-600 hover:text-brand-700">← Ver pedidos</Link>
+        <p className="text-lg font-semibold text-slate-900">Order not found</p>
+        <p className="mt-1 text-sm text-slate-500">Check the address or go back to the list.</p>
+        <Link to="/" className="mt-5 inline-block font-medium text-brand-600 hover:text-brand-700">← View orders</Link>
       </Card>
     )
   }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <Link to="/" className="text-sm font-medium text-brand-600 hover:text-brand-700">← Pedidos</Link>
+      <Link to="/" className="text-sm font-medium text-brand-600 hover:text-brand-700">← Orders</Link>
 
       {error && <ErrorState message={error} onRetry={() => load()} />}
 
@@ -83,21 +83,21 @@ export default function OrderDetails() {
           <Card className={`p-6 ${flash ? 'animate-flash' : ''}`}>
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0">
-                <p className="font-mono text-xs text-slate-500">Pedido {order.id}</p>
-                <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-slate-900">{order.produto}</h1>
-                <p className="mt-1 text-slate-600">{order.cliente}</p>
+                <p className="font-mono text-xs text-slate-500">Order {order.id}</p>
+                <h1 className="mt-1 truncate text-2xl font-semibold tracking-tight text-slate-900">{order.product}</h1>
+                <p className="mt-1 text-slate-600">{order.customer}</p>
               </div>
               <StatusBadge status={order.status} />
             </div>
 
             <dl className="mt-6 grid gap-4 sm:grid-cols-2">
               <div className="rounded-lg bg-slate-50 p-4">
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Valor</dt>
-                <dd className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{formatCurrency(order.valor)}</dd>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Amount</dt>
+                <dd className="mt-1 text-xl font-semibold tabular-nums text-slate-900">{formatCurrency(order.amount)}</dd>
               </div>
               <div className="rounded-lg bg-slate-50 p-4">
-                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Criado em</dt>
-                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatDateTime(order.dataCriacao)}</dd>
+                <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Created</dt>
+                <dd className="mt-1 text-xl font-semibold text-slate-900">{formatDateTime(order.createdAt)}</dd>
               </div>
             </dl>
 
@@ -107,8 +107,8 @@ export default function OrderDetails() {
           </Card>
 
           <Card className="p-6">
-            <h2 className="mb-5 text-base font-semibold text-slate-900">Histórico de status</h2>
-            <StatusTimeline history={order.historico} />
+            <h2 className="mb-5 text-base font-semibold text-slate-900">Status history</h2>
+            <StatusTimeline history={order.statusHistory} />
           </Card>
         </>
       )}

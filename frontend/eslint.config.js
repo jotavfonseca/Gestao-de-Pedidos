@@ -27,7 +27,7 @@ export default defineConfig([
     },
   },
   {
-    // Arquivos de configuração rodam no Node.
+    // Config files run on Node.
     files: ['*.config.js'],
     languageOptions: { globals: globals.node },
   },

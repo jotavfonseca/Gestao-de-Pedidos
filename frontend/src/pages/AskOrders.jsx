@@ -3,18 +3,18 @@ import { askQuestion, fetchAskStatus } from '../services/api'
 import { Card } from '../components/Feedback'
 
 const EXAMPLES = [
-  'Quantos pedidos temos hoje?',
-  'Qual o tempo médio para aprovar os pedidos?',
-  'Quantos pedidos estão pendentes?',
-  'Qual o valor total de pedidos finalizados este mês?',
+  'How many orders do we have today?',
+  'What is the average time to approve an order?',
+  'How many orders are pending?',
+  'What is the total amount of completed orders this month?',
 ]
 
 const TOOL_LABELS = {
-  count_orders: 'Contagem de pedidos',
-  sum_order_values: 'Soma de valores',
-  avg_processing_time: 'Tempo de processamento',
-  orders_by_status: 'Pedidos por status',
-  list_recent_orders: 'Pedidos recentes',
+  count_orders: 'Order count',
+  sum_order_amounts: 'Amount totals',
+  avg_processing_time: 'Processing time',
+  orders_by_status: 'Orders by status',
+  list_recent_orders: 'Recent orders',
 }
 
 export default function AskOrders() {
@@ -47,7 +47,7 @@ export default function AskOrders() {
       const result = await askQuestion(value)
       setConversation((current) => [...current, { role: 'assistant', text: result.answer, toolCalls: result.toolCalls }])
     } catch (e) {
-      if (e.status === 503 && e.title?.includes('desativado')) setEnabled(false)
+      if (e.status === 503 && e.title?.toLowerCase().includes('disabled')) setEnabled(false)
       setConversation((current) => [...current, { role: 'error', text: e.message }])
     } finally {
       setAsking(false)
@@ -57,19 +57,19 @@ export default function AskOrders() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Pergunte sobre os pedidos</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Ask about your orders</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Faça perguntas em linguagem natural. O Claude consulta o banco com ferramentas somente leitura e responde com
-          dados reais.
+          Ask questions in plain English. Claude queries the database through read-only tools and answers with real
+          data.
         </p>
       </div>
 
       {enabled === false && (
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <p className="font-semibold">Módulo de IA desativado</p>
+          <p className="font-semibold">AI module disabled</p>
           <p className="mt-1">
-            Defina <code className="rounded bg-amber-100 px-1">ANTHROPIC_API_KEY</code> no arquivo{' '}
-            <code className="rounded bg-amber-100 px-1">.env</code> e reinicie a API para ativar.
+            Set <code className="rounded bg-amber-100 px-1">ANTHROPIC_API_KEY</code> in the{' '}
+            <code className="rounded bg-amber-100 px-1">.env</code> file and restart the API to enable it.
           </p>
         </div>
       )}
@@ -77,7 +77,7 @@ export default function AskOrders() {
       <Card className="p-4 sm:p-6">
         {conversation.length === 0 ? (
           <div>
-            <p className="text-sm font-medium text-slate-700">Experimente:</p>
+            <p className="text-sm font-medium text-slate-700">Try:</p>
             <div className="mt-3 flex flex-wrap gap-2">
               {EXAMPLES.map((example) => (
                 <button
@@ -100,7 +100,7 @@ export default function AskOrders() {
             {asking && (
               <li className="flex items-center gap-2 text-sm text-slate-500">
                 <span className="size-2 animate-pulse rounded-full bg-brand-500" aria-hidden="true" />
-                Consultando os pedidos…
+                Querying the orders…
               </li>
             )}
             <li ref={endRef} aria-hidden="true" />
@@ -114,14 +114,14 @@ export default function AskOrders() {
             ask(question)
           }}
         >
-          <label htmlFor="question" className="sr-only">Pergunta</label>
+          <label htmlFor="question" className="sr-only">Question</label>
           <input
             id="question"
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
             maxLength={500}
             disabled={!enabled}
-            placeholder={enabled ? 'Ex.: Qual o ticket médio desta semana?' : 'Módulo de IA desativado'}
+            placeholder={enabled ? 'e.g. What is the average order value this week?' : 'AI module disabled'}
             className="flex-1 rounded-lg border border-slate-300 px-3 py-2 shadow-sm placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-slate-50"
           />
           <button
@@ -129,7 +129,7 @@ export default function AskOrders() {
             disabled={!enabled || asking || !question.trim()}
             className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Perguntar
+            Ask
           </button>
         </form>
       </Card>
@@ -152,22 +152,22 @@ function Message({ message }) {
     )
   }
 
+  const count = message.toolCalls?.length ?? 0
   return (
     <li className="max-w-[90%] space-y-2">
       <p className="whitespace-pre-line rounded-2xl rounded-bl-sm bg-slate-100 px-4 py-3 text-sm text-slate-800">
         {message.text}
       </p>
-      {message.toolCalls?.length > 0 && (
+      {count > 0 && (
         <details className="text-xs text-slate-500">
           <summary className="cursor-pointer select-none">
-            {message.toolCalls.length} consulta{message.toolCalls.length > 1 ? 's' : ''} realizada
-            {message.toolCalls.length > 1 ? 's' : ''}
+            {count} {count > 1 ? 'queries' : 'query'} run
           </summary>
           <ul className="mt-2 space-y-1">
             {message.toolCalls.map((call, index) => (
               <li key={index} className="font-mono">
                 {TOOL_LABELS[call.name] ?? call.name}
-                {call.isError && ' (parâmetros inválidos)'}: {JSON.stringify(call.input)}
+                {call.isError && ' (invalid parameters)'}: {JSON.stringify(call.input)}
               </li>
             ))}
           </ul>

@@ -55,7 +55,7 @@ export default function ToastProvider({ children }) {
               type="button"
               onClick={() => dismiss(toast.id)}
               className="rounded text-slate-400 hover:text-slate-600"
-              aria-label="Fechar notificação"
+              aria-label="Dismiss notification"
             >
               ×
             </button>
