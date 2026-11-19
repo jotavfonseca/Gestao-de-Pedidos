@@ -1,71 +1,134 @@
-version: '3.9'
+name: gestao-de-pedidos
+
+# Uso:  cp .env.example .env && docker compose up --build -d
+# Frontend http://localhost:3000 · Swagger http://localhost:5000/swagger
+# pgAdmin http://localhost:8080 · Jaeger http://localhost:16686
+
+x-dotnet-env: &dotnet-env
+  ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+  ConnectionStrings__ServiceBus: ${SERVICEBUS_CONNECTION_STRING}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+
 services:
   postgres:
-    image: postgres:15
-    env_file:
-      - .env
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - orders_pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   pgadmin:
-    image: dpage/pgadmin4
-    env_file:
-      - .env
+    image: dpage/pgadmin4:8
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
     ports:
-      - "8080:80"
+      - "${PGADMIN_PORT:-8080}:80"
+    volumes:
+      - ./infra/pgadmin/servers.json:/pgadmin4/servers.json:ro
     depends_on:
       postgres:
         condition: service_healthy
 
-  api:
-    build: 
-      context: ./api/Orders.Api
-    env_file:
-      - .env
+  # SQL Server: armazenamento exigido pelo emulador do Service Bus
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
     environment:
-      ConnectionStrings__Postgres: "${CONNECTION_STR}"
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ACCEPT_EULA: ${ACCEPT_EULA}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  # Emulador oficial do Azure Service Bus (filas em infra/servicebus/config.json)
+  servicebus:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:2.0.1
+    environment:
+      SQL_SERVER: sqlserver
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      ACCEPT_EULA: ${ACCEPT_EULA}
+      SQL_WAIT_INTERVAL: "5"
+    volumes:
+      - ./infra/servicebus/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
     ports:
-      - "5000:80"
+      - "5672:5672"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "${JAEGER_UI_PORT:-16686}:16686"
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Orders.Api/Dockerfile
+    environment:
+      <<: *dotnet-env
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "${API_PORT:-5000}:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      servicebus:
+        condition: service_started
+      jaeger:
+        condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost/health || exit 1"]
+      # "healthy" só quando API, PostgreSQL e Service Bus estão prontos
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
       interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Orders.Worker/Dockerfile
+    environment:
+      <<: *dotnet-env
+      DOTNET_ENVIRONMENT: ${DOTNET_ENVIRONMENT}
+      Processing__DelaySeconds: ${WORKER_PROCESSING_DELAY_SECONDS:-5}
+      Worker__HeartbeatFile: /tmp/orders-worker.heartbeat
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      # Heartbeat atualizado a cada 10 s
+      test: ["CMD-SHELL", "find /tmp/orders-worker.heartbeat -mmin -1 | grep -q ."]
+      interval: 15s
       timeout: 5s
-      retries: 5
+      retries: 3
+      start_period: 15s
 
   frontend:
     build:
       context: ./frontend
-    env_file:
-      - .env
     ports:
-      - "3000:80"
+      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
-      - api
-    environment:
-      VITE_API_URL: "http://localhost:5000" # Frontend deve usar esta URL para consumir API
-    healthcheck:
-      test: ["CMD-SHELL", "wget --spider -S http://localhost || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
+      api:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  orders_pgdata:
