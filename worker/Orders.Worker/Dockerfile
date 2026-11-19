@@ -1,18 +1,19 @@
-# Build stage
+# Contexto de build: raiz do repositÃ³rio (precisa de shared/ e dos Directory.*.props)
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Copia todos os arquivos do Worker para o container
-COPY . .
+COPY Directory.Build.props Directory.Packages.props ./
+COPY shared/Orders.Core/Orders.Core.csproj shared/Orders.Core/
+COPY worker/Orders.Worker/Orders.Worker.csproj worker/Orders.Worker/
+RUN dotnet restore worker/Orders.Worker/Orders.Worker.csproj
 
-# Se a API está fora do contexto, precisa copiar manualmente
-# COPY ../../api ../api   # só se quiser referenciar diretamente
+COPY shared/ shared/
+COPY worker/ worker/
+RUN dotnet publish worker/Orders.Worker/Orders.Worker.csproj -c Release -o /app --no-restore
 
-RUN dotnet restore
-RUN dotnet publish -c Release -o /app
-
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/runtime:8.0
+FROM mcr.microsoft.com/dotnet/runtime:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app .
+
+USER app
 ENTRYPOINT ["dotnet", "Orders.Worker.dll"]
